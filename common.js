@@ -134,3 +134,15 @@ async function sideWorker() {
   const nav = $('#nav');
   if (nav && !nav.querySelector('.wk') && await workerAppsOpen()) nav.append(h('a', { class: 'wk', href: 'worker.html' }, '👷 طلب العمل'));
 }
+
+// اسم الموقع وصورة الواجهة (يعدّلهما المدير من الإعدادات)
+const bannerUrl = p => `${CFG.SUPABASE_URL}/storage/v1/object/public/site-assets/${p}`;
+async function applySite() {
+  let s = null;
+  try { s = await rpc('site_info'); } catch {}
+  if (!s) return;
+  document.querySelectorAll('.sn').forEach(e => { e.textContent = s.name; });
+  const b = $('#banner'); if (b && s.banner) b.src = bannerUrl(s.banner);
+  document.title = document.title.replace('عقارات سوف', s.name);
+}
+applySite();

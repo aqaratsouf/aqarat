@@ -295,13 +295,28 @@ async function settingsView() {
   f3.onsubmit = e => { e.preventDefault(); act(() => ok(sb.from('settings').update({
     notify_telegram_token: tt.value.trim() || null, notify_telegram_chat: tc.value.trim() || null,
     notify_wa_phone: wp.value.trim() || null, notify_wa_key: wk.value.trim() || null }).eq('id', 1)), 'تم حفظ الإشعارات'); };
+  const si = await rpc('site_info');
+  const sname = h('input', { value: si.name, maxlength: 40, required: true });
+  const sfile = h('input', { type: 'file', accept: 'image/*' });
+  const prev = h('img', { class: 'banner', src: si.banner ? bannerUrl(si.banner) : 'banner.jpg', style: 'margin:8px 0;max-height:180px;object-fit:cover' });
+  const f5 = h('form', { class: 'card pad' }, h('h3', {}, '🎨 هوية الموقع'),
+    h('label', {}, 'اسم الموقع'), sname,
+    h('label', {}, 'صورة الواجهة الرئيسية (اتركها فارغة للإبقاء على الحالية)'), prev, sfile,
+    h('div', { style: 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap' },
+      h('button', { class: 'btn pri' }, 'حفظ'),
+      h('button', { type: 'button', class: 'btn', onclick: () => confirm('العودة إلى الصورة الأصلية؟') && act(() => ok(sb.from('settings').update({ banner_path: null }).eq('id', 1)), 'تمت العودة للصورة الأصلية') }, 'الصورة الأصلية')));
+  f5.onsubmit = e => { e.preventDefault(); act(async () => {
+    const upd = { site_name: sname.value.trim() };
+    if (sfile.files[0]) upd.banner_path = await uploadTo('site-assets', sfile.files[0]);
+    await ok(sb.from('settings').update(upd).eq('id', 1));
+  }, 'تم حفظ هوية الموقع'); };
   const open = await workerAppsOpen();
   const sw = h('input', { type: 'checkbox' }); sw.checked = !!open;
   sw.onchange = () => act(() => ok(sb.from('settings').update({ worker_apps_open: sw.checked }).eq('id', 1)), sw.checked ? 'فُتح استقبال طلبات العمل' : 'أُوقف استقبال طلبات العمل');
   const f4 = h('div', { class: 'card pad' }, h('h3', {}, '👷 طلبات العمل'),
     h('label', { style: 'font-weight:400' }, sw, ' استقبال طلبات العمل مفتوح (تظهر أيقونة «طلب العمل» للزوار)'),
     h('div', { class: 'muted' }, 'عند الإيقاف تختفي الأيقونة ولا يُقبل أي طلب جديد.'));
-  return h('div', {}, f4, f1, f3, f2);
+  return h('div', {}, f5, f4, f1, f3, f2);
 }
 
 async function boot() {
