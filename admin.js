@@ -93,6 +93,12 @@ async function ordersView() {
 }
 
 // ---------------- العروض ----------------
+function ownerMsg(l) {
+  const link = new URL('status.html?t=' + l.track_token, location.href).href;
+  const intl = l.owner_phone.startsWith('0') ? '213' + l.owner_phone.slice(1) : l.owner_phone.replace('+', '');
+  const txt = `السلام عليكم، بخصوص عرضك (${l.title}). تتابع حالته من هذا الرابط الخاص: ${link}`;
+  return `https://wa.me/${intl}?text=${encodeURIComponent(txt)}`;
+}
 async function listingsView() {
   const [ls, rate] = await Promise.all([ok(sb.from('listings').select('*').order('id', { ascending: false })), rpc('get_rate')]);
   const setStatus = (id, status, msg) => act(() => ok(sb.from('listings').update({ status }).eq('id', id)), msg);
@@ -116,6 +122,7 @@ async function listingsView() {
         h('div', { style: 'display:flex;gap:6px;margin-top:8px;flex-wrap:wrap' },
           l.status !== 'active' ? h('button', { class: 'btn pri sm', onclick: () => setStatus(l.id, 'active', 'تم النشر') }, 'نشر') : null,
           l.status === 'active' ? h('button', { class: 'btn sm', onclick: () => setStatus(l.id, 'hidden') }, 'إخفاء') : null,
+          h('a', { class: 'btn sm', style: 'text-decoration:none', target: '_blank', rel: 'noopener', href: ownerMsg(l) }, '💬 واتساب للمالك'),
           h('button', { class: 'btn red sm', onclick: () => del(l) }, 'حذف')))));
   }
   root.append(grid);

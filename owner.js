@@ -71,12 +71,22 @@ form.addEventListener('submit', async ev => {
       const { sel, file } = r._get();
       photos.push({ label: sel.value, file: await uploadTo('listing-photos', file.files[0]) });
     }
-    await rpc('submit_listing', { p: {
+    const res = await rpc('submit_listing', { p: {
       kind: kindSel.value, title: title.value, description: desc.value, owner_name: oname.value, owner_phone: ophone.value,
       address: addr.value, lat, lng, map_url: mapurl.value, price: parseInt(price.value), photos } });
+    try {
+      const mine = JSON.parse(localStorage.getItem('aq_my') || '[]');
+      mine.unshift({ token: res.token, title: title.value });
+      localStorage.setItem('aq_my', JSON.stringify(mine.slice(0, 30)));
+    } catch {}
+    const link = new URL('status.html?t=' + res.token, location.href).href;
     form.replaceChildren(h('div', { class: 'sum' }, h('h3', {}, '✅ تم استلام عرضك'),
-      h('p', {}, 'سنراجعه ثم ننشره، وسنتصل بك على الرقم ' + ophone.value + ' عند وجود طلب.'),
-      h('a', { class: 'btn pri', href: 'index.html' }, 'العودة للموقع')));
+      h('p', {}, '⏳ حالة العرض الآن: قيد المراجعة. سننشره بعد الموافقة عليه، وسنتصل بك على الرقم ' + ophone.value + ' عند وجود طلب.'),
+      h('p', {}, 'احتفظ بهذا الرابط السري لتتابع حالة عرضك في أي وقت:'),
+      h('input', { readonly: true, value: link, onclick: e => e.target.select(), dir: 'ltr' }),
+      h('div', { style: 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap' },
+        h('a', { class: 'btn pri', href: link }, 'متابعة حالة عرضي'),
+        h('button', { type: 'button', class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('تم نسخ الرابط'); } catch { toast('انسخ الرابط يدوياً من الخانة', false); } } }, '📋 نسخ الرابط'))));
   } catch (e) { toast(e.message, false); btn.disabled = false; btn.textContent = 'إرسال العرض'; }
 });
 

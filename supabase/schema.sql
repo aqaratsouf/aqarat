@@ -29,8 +29,10 @@ create table if not exists public.listings (
   price integer not null check (price > 0),
   photos jsonb not null default '[]'::jsonb,
   status text not null default 'pending' check (status in ('pending', 'active', 'hidden')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  track_token uuid not null default gen_random_uuid()
 );
+create unique index if not exists listings_track_token_key on public.listings (track_token);
 
 create table if not exists public.workers (
   id bigint generated always as identity primary key,
@@ -123,7 +125,8 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- ---------- إرسال عرض من صاحب شقة (يبقى "بانتظار المراجعة") ----------
-create or replace function public.submit_listing(p jsonb) returns bigint
+drop function if exists public.submit_listing(jsonb);
+create function public.submit_listing(p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_kind text := p->>'kind';
@@ -136,6 +139,7 @@ declare
   v_lng double precision;
   v_map text;
   v_id bigint;
+  v_token uuid;
 begin
   if v_kind is null or v_kind not in ('furnished', 'unfurnished') then
     raise exception 'نوع الشقة غير صالح';
@@ -186,9 +190,16 @@ begin
           v_phone,
           public._req_text(p->>'address', 'الموقع', 3, 200),
           v_lat, v_lng, v_map, v_price::int, v_clean, 'pending')
-  returning id into v_id;
-  return v_id;
+  returning id, track_token into v_id, v_token;
+  return jsonb_build_object('id', v_id, 'token', v_token);
 end $$;
+
+-- ---------- حالة عرض واحد عبر رمزه السري (لا تُرجع هاتفاً ولا سعراً) ----------
+create or replace function public.get_listing_status(p_token uuid)
+returns table (title text, kind text, status text)
+language sql stable security definer set search_path = public as $$
+  select l.title, l.kind, l.status from public.listings l where l.track_token = p_token;
+$$;
 
 -- ---------- طلب حجز من زبون (الأسعار تُحسب هنا في الخادم) ----------
 create or replace function public.create_order(p jsonb) returns jsonb
@@ -290,7 +301,7 @@ grant usage, select on all sequences in schema public to authenticated;
 
 -- الزبائن وأصحاب الشقق (بدون حساب) لا يصلون للجداول إلا عبر هذه الدوال فقط
 grant execute on function public.get_rate(), public.public_listings(text),
-  public.submit_listing(jsonb), public.create_order(jsonb), public.am_i_admin()
+  public.submit_listing(jsonb), public.create_order(jsonb), public.am_i_admin(), public.get_listing_status(uuid)
   to anon, authenticated;
 -- للمدير فقط
 grant execute on function public.is_admin(),
