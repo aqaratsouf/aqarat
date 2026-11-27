@@ -24,3 +24,8 @@
 بعد `supabase/schema.sql` شغّل بالترتيب الملفات في `supabase/migrations/`:
 - `002_bookings_payment.sql` — تواريخ الحجز، منع التداخل، حالة الدفع، العمال بدون بطاقة.
 - `003_notifications.sql` — إشعارات تيليغرام/واتساب (تُضبط من الإعدادات في لوحة المدير).
+- `004_accounts_workers.sql` — حسابات الزبائن/المالكين/العمال، طلبات العمل، مهام العمال.
+- `005_worker_apps_switch.sql` — مفتاح تفعيل/إيقاف طلبات العمل.
+
+## الصفحات
+`index.html` الرئيسية · `client.html` الزبون · `owner.html` صاحب الشقة · `worker.html` العامل · `admin.html` المدير.

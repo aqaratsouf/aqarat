@@ -3,13 +3,57 @@ const KINDS = {
   unfurnished: { tab: 'شقق غير مجهزة (بالشهر)', unit: 'شهر', units: 'عدد الأشهر', per: 'للشهر الواحد' },
 };
 const RELATIONS = ['زوجة', 'زوج', 'ابن', 'ابنة', 'أب', 'أم', 'أخ', 'أخت', 'جد', 'جدة', 'أخرى'];
-let kind = 'furnished';
+let kind = null, me = null;
+const app = $('#app');
+const remember = k => { try { localStorage.setItem('aq_kind', k); } catch {} sb.auth.updateUser({ data: { pref_kind: k } }).catch(() => {}); };
 
 function renderTabs() {
   const t = $('#tabs'); t.replaceChildren();
   for (const k of Object.keys(KINDS))
-    t.append(h('button', { class: k === kind ? 'on' : '', onclick: () => { kind = k; renderTabs(); load(); } }, KINDS[k].tab));
+    t.append(h('button', { class: k === kind ? 'on' : '', onclick: () => { kind = k; remember(k); renderTabs(); load(); } }, KINDS[k].tab));
 }
+
+function chooseView() {
+  app.replaceChildren(h('h2', {}, 'مرحباً ' + (userName(me) || '') + ' 👋'), h('div', { class: 'muted' }, 'ماذا تريد أن تكتري؟ (يُحفظ اختيارك في حسابك)'),
+    h('div', { class: 'choose' },
+      h('button', { class: 'pick', onclick: () => { kind = 'furnished'; remember(kind); listView(); } }, h('span', { class: 'ic' }, '🛏️'), h('b', {}, 'شقة مجهزة'), h('span', {}, 'كراء باليوم — للعلاج والسياحة')),
+      h('button', { class: 'pick gold', onclick: () => { kind = 'unfurnished'; remember(kind); listView(); } }, h('span', { class: 'ic' }, '📅'), h('b', {}, 'شقة غير مجهزة'), h('span', {}, 'كراء بالشهر أو السنة'))));
+}
+
+function listView() {
+  app.replaceChildren(h('div', { class: 'tabs', id: 'tabs' }), h('div', { class: 'grid', id: 'grid' }));
+  renderTabs(); load();
+  }
+
+const STEP = o => o.status === 'cancelled' ? ['no', '❌ تم إلغاء الطلب']
+  : o.paid ? ['done', '💰 تم تسليم المبلغ']
+  : o.status === 'confirmed' ? ['go', '✅ تمت الموافقة — بانتظار تسليم المبلغ'] : ['wait', '⏳ طلبك قيد الانتظار (بانتظار التأكيد)'];
+async function ordersView() {
+  app.replaceChildren(h('div', { class: 'empty' }, 'جاري التحميل...'));
+  try {
+    const os = await rpc('my_orders');
+    app.replaceChildren(h('h2', {}, 'طلباتي'), ...(os.length ? os.map(o => {
+      const [cls, txt] = STEP(o);
+      return h('div', { class: 'card pad' },
+        h('div', {}, h('b', {}, o.listing_title + ' '), h('span', { class: 'step ' + cls }, txt)),
+        h('div', { class: 'muted' }, '📍 ' + o.address),
+        h('div', {}, period(o) + ' — ' + o.units + ' ' + unitWord(o)),
+        h('div', {}, 'المبلغ الإجمالي: ', h('b', {}, money(o.total))),
+        o.status === 'confirmed' && !o.paid ? h('div', { class: 'note' }, 'عليك الآن تسليم المبلغ الإجمالي للوسيط. بعد استلامه تظهر لك هنا بيانات صاحب الشقة للتواصل المباشر.') : null,
+        o.paid ? h('div', { class: 'sum' }, h('div', {}, h('span', {}, 'صاحب الشقة'), h('span', {}, o.owner_name)),
+          h('div', {}, h('span', {}, 'هاتفه'), h('a', { class: 'link', href: 'tel:' + o.owner_phone }, o.owner_phone))) : null);
+    }) : [h('div', { class: 'empty' }, 'لم تقدّم أي طلب بعد.')]));
+  } catch (e) { app.replaceChildren(h('div', { class: 'empty' }, e.message)); }
+}
+
+requireAuth(app, { title: 'ابحث عن شقة للكراء', sub: 'سجّل دخولك أو أنشئ حساباً لتتصفح الشقق وتتابع طلباتك.' }, user => {
+  me = user;
+  setNav([['الشقق', '#', () => (kind ? listView() : chooseView())], ['طلباتي', '#', ordersView], ['الرئيسية', 'index.html'], ['خروج', '#', logout]]);
+  let pref = (user.user_metadata || {}).pref_kind;
+  try { pref = pref || localStorage.getItem('aq_kind'); } catch {}
+  if (pref && KINDS[pref]) { kind = pref; listView(); } else chooseView();
+  sideWorker();
+});
 
 async function load() {
   const g = $('#grid'); g.replaceChildren(h('div', { class: 'empty' }, 'جاري التحميل...'));
@@ -66,7 +110,7 @@ function openListing(l) {
   };
   const sum = h('div', { class: 'sum' });
   const comps = h('div');
-  const name = h('input', { required: true, maxlength: 80, autocomplete: 'name' });
+  const name = h('input', { required: true, maxlength: 80, autocomplete: 'name', value: userName(me) });
   const tel = h('input', { type: 'tel', required: true, inputmode: 'tel', placeholder: '05XXXXXXXX', autocomplete: 'tel' });
   const agree = h('input', { type: 'checkbox', required: true });
   const btn = h('button', { class: 'btn pri', type: 'submit', style: 'width:100%;margin-top:8px' }, 'تأكيد طلب الحجز');
@@ -145,4 +189,4 @@ function openListing(l) {
       h('hr'), form)));
 }
 
-renderTabs(); load();
+

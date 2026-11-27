@@ -99,3 +99,36 @@ function mapLink(l) {
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ---------- واتساب: رسائل جاهزة (تُرسَل بضغطة من المرسِل) ----------
+const intl = p => p.startsWith('0') ? '213' + p.slice(1) : p.replace(/^\+/, '');
+const wa = (phone, txt) => `https://wa.me/${intl(phone)}?text=${encodeURIComponent(txt)}`;
+const waBtn = (label, href, cls = 'btn sm') => h('a', { class: cls, style: 'text-decoration:none', target: '_blank', rel: 'noopener', href }, label);
+const period = o => `من ${fd(o.start_date)} إلى ${fd(o.end_date)}`;
+const unitWord = o => o.kind === 'furnished' ? 'يوم' : 'شهر';
+// رسالة لصاحب الشقة: تم كراء سكنك
+const ownerMsg = (o, paid) => `السلام عليكم ${o.owner_name}، ${paid ? 'تم تسليم المبلغ و' : ''}تم كراء شقتك «${o.listing_title}» من طرف الزبون ${o.client_name} (هاتفه: ${o.client_phone}) لمدة ${o.units} ${unitWord(o)} ${period(o)}. المبلغ المستحق لك: ${money(o.owner_total)}. نرجو تنبيه الزبون على الحفاظ على نظافة الشقة وتجهيزاتها. (عقارات سوف)`;
+// رسالة للزبون عند الموافقة
+const clientApprovedMsg = o => `السلام عليكم ${o.client_name}، تمت الموافقة على حجزك «${o.listing_title}» ${period(o)}. المبلغ الإجمالي المطلوب منك: ${money(o.total)}. سلّمه للوسيط وسنرسل لك رقم صاحب الشقة. (عقارات سوف)`;
+// رسالة للزبون عند تسليم المبلغ
+const clientPaidMsg = o => `السلام عليكم ${o.client_name}، تم حجز الشقة «${o.listing_title}» ${period(o)}. المبلغ المستحق لصاحب الشقة: ${money(o.owner_total)}. رقم صاحب الشقة للتواصل المباشر: ${o.owner_name} ${o.owner_phone}. العنوان: ${o.address}. نتمنى لكم إقامة طيبة. (عقارات سوف)`;
+
+// نافذة فيها أزرار واتساب جاهزة
+function showMsgs(title, items) {
+  const m = h('div', { class: 'modal', onclick: e => { if (e.target === m) m.remove(); } },
+    h('div', { class: 'box', style: 'max-width:420px' },
+      h('h3', {}, title), h('div', { class: 'muted' }, 'اضغط كل زر لفتح واتساب برسالة جاهزة ثم اضغط إرسال.'),
+      h('div', { style: 'display:grid;gap:8px;margin:12px 0' }, items.map(([l, href]) => waBtn(l, href, 'btn pri'))),
+      h('button', { class: 'btn', onclick: () => m.remove() }, 'إغلاق')));
+  document.body.append(m);
+}
+
+const workerLink = () => new URL('worker.html', location.href).href;
+const workerAppsOpen = () => rpc('worker_apps_open').catch(() => false);
+function setNav(items) {
+  $('#nav').replaceChildren(...items.map(([label, href, fn]) => h('a', { href: href || '#', onclick: fn ? (e => { e.preventDefault(); fn(); }) : null }, label)));
+}
+// أيقونة جانبية «طلب العمل» تظهر فقط عندما يفعّلها المدير
+async function sideWorker() {
+  if (await workerAppsOpen()) document.body.append(h('a', { class: 'side', href: 'worker.html' }, h('span', {}, '👷'), 'طلب', h('br'), 'العمل'));
+}

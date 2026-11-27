@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0f766e">
-<title>عقارات — أضف شقتك</title>
+<meta name="theme-color" content="#0b2a5b">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
+<title>عقارات سوف — صاحب الشقة</title>
 </head>
 <body>
-<header class="top"><h1>🏠 عقارات</h1><nav><a href="status.html">تتبّع عروضي</a><a href="index.html">العروض</a></nav></header>
-<main style="max-width:720px">
-  <h2>أضف شقتك للكراء</h2>
-  <div class="muted">يظهر عرضك بعد مراجعته من طرفنا.</div>
-  <form id="f" class="card pad" style="margin-top:12px"></form>
-</main>
+<header class="top"><h1>🏠 عقارات سوف</h1><nav id="nav"></nav></header>
+<main id="app" style="max-width:720px"></main>
+<footer>© عقارات سوف</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="common.js"></script>
+<script src="auth.js"></script>
 <script src="owner.js"></script>
 </body>
 </html>

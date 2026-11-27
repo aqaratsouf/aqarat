@@ -1,4 +1,4 @@
-const TABS = { orders: 'الطلبات', listings: 'العروض', workers: 'العمال', settings: 'الإعدادات' };
+const TABS = { orders: 'الطلبات', listings: 'العروض', apps: 'طلبات العمل', workers: 'العمال', settings: 'الإعدادات' };
 const ST = { new: 'جديد', confirmed: 'مؤكد', paid: 'مدفوع', cancelled: 'ملغى', pending: 'بانتظار المراجعة', active: 'منشور', hidden: 'مخفي' };
 const KL = { furnished: 'مجهزة (باليوم)', unfurnished: 'غير مجهزة (بالشهر)' };
 const app = $('#app');
@@ -6,12 +6,6 @@ let tab = 'orders', ofilter = 'new';
 
 const tel = p => h('a', { href: 'tel:' + p, class: 'link' }, p);
 const kv = pairs => h('div', { class: 'kv' }, pairs.map(([k, v]) => [h('b', {}, k), h('span', {}, v)]));
-const intl = p => p.startsWith('0') ? '213' + p.slice(1) : p.replace(/^\+/, '');
-const wa = (phone, txt) => `https://wa.me/${intl(phone)}?text=${encodeURIComponent(txt)}`;
-const waBtn = (label, href, cls = 'btn sm') => h('a', { class: cls, style: 'text-decoration:none', target: '_blank', rel: 'noopener', href }, label);
-const period = o => `من ${fd(o.start_date)} إلى ${fd(o.end_date)}`;
-const clientMsg = o => `السلام عليكم ${o.client_name}، تم استلام مبلغ كراء «${o.listing_title}» (${period(o)}). هذا رقم صاحب الشقة للتواصل معه مباشرة: ${o.owner_name} ${o.owner_phone}. العنوان: ${o.address}. نتمنى لكم إقامة طيبة. (عقارات)`;
-const ownerBookMsg = o => `السلام عليكم ${o.owner_name}، تم تأكيد حجز شقتك «${o.listing_title}» ${period(o)} باسم ${o.client_name} (${1 + o.companions.length} أشخاص). مبلغك: ${money(o.owner_total)}. نرجو تنبيه الزبون على الحفاظ على نظافة الشقة وتجهيزاتها. (عقارات)`;
 const cutFor = (o, ratePct) => Math.min(Math.floor(o.owner_total * ratePct / 100 + 0.5), o.commission);
 
 function loginView() {
@@ -40,7 +34,7 @@ function nav() {
 async function render() {
   nav();
   app.replaceChildren(h('div', { class: 'empty' }, 'جاري التحميل...'));
-  try { app.replaceChildren(await ({ orders: ordersView, listings: listingsView, workers: workersView, settings: settingsView })[tab]()); }
+  try { app.replaceChildren(await ({ orders: ordersView, listings: listingsView, apps: appsView, workers: workersView, settings: settingsView })[tab]()); }
   catch (e) { app.replaceChildren(h('div', { class: 'empty' }, e.message)); }
 }
 
@@ -89,21 +83,20 @@ async function ordersView() {
       if (!o.paid) {
         wrap.append(h('button', { class: 'btn pri', onclick: async () => {
           if (!confirm('تأكيد أن الزبون سلّمك المبلغ؟ سيُحتسب في حساباتك.')) return;
-          const win = window.open('', '_blank'); // نفتح النافذة الآن كي لا يحجبها المتصفح
           try {
             await rpc('admin_set_paid', { p_order: o.id, p_paid: true });
-            toast('تم تسجيل استلام المبلغ — أرسل رقم المالك للزبون');
-            if (win) win.location = wa(o.client_phone, clientMsg(o));
-          } catch (e) { if (win) win.close(); toast(e.message, false); }
+            toast('تم تسجيل استلام المبلغ');
+            showMsgs('تم استلام المبلغ — أبلغ الطرفين', [['💬 أبلغ الزبون (مع رقم صاحب الشقة)', wa(o.client_phone, clientPaidMsg(o))], ['💬 أبلغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, true))]]);
+          } catch (e) { toast(e.message, false); }
           render();
         } }, '💰 الزبون سلّم المبلغ'),
           h('button', { class: 'btn red', onclick: () => confirm('إلغاء هذا الحجز المؤكد وتحرير تواريخه؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الحجز'));
       } else {
         wrap.append(h('div', { class: 'muted', style: 'width:100%' }, 'استُلم المبلغ: ' + fdate(o.paid_at)),
-          waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientMsg(o)), 'btn pri sm'),
+          waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o)), 'btn pri sm'),
           h('button', { class: 'btn sm', onclick: () => confirm('التراجع عن حالة الاستلام؟ سيُخصم من حساباتك.') && act(() => rpc('admin_set_paid', { p_order: o.id, p_paid: false }), 'تم التراجع') }, 'تراجع عن الاستلام'));
       }
-      wrap.append(waBtn('💬 إبلاغ صاحب الشقة', wa(o.owner_phone, ownerBookMsg(o))));
+      wrap.append(waBtn('💬 إبلاغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, o.paid))));
       if (o.workers) wrap.append(waBtn('💬 تفاصيل للعامل', wa(o.workers.phone, `طلب #${o.id}: ${o.listing_title} — ${o.address} — ${period(o)} — الزبون ${o.client_name} ${o.client_phone}`)));
       card.append(h('hr'), wrap);
     }
@@ -114,9 +107,28 @@ async function ordersView() {
         const w = active.find(x => String(x.id) === ws.value);
         profitSpan.textContent = money(o.commission - (w ? cutFor(o, w.rate_pct) : 0));
       };
-      card.append(h('hr'), h('label', {}, 'العامل الذي نسّق هذا الطلب'), ws,
+      if (o.workers) card.append(h('div', { class: 'note' }, '📤 مُسند إلى العامل: ' + o.workers.name + ' — ينتظر تأكيده.',
+        h('div', { style: 'margin-top:6px;display:flex;gap:6px;flex-wrap:wrap' }, waBtn('💬 ذكّره', wa(o.workers.phone, `تذكير: لديك مهمة طلب #${o.id} — ${o.listing_title}. صفحتك: ${workerLink()} (عقارات سوف)`)),
+          h('button', { class: 'btn sm', onclick: () => act(() => rpc('admin_assign_order', { p_order: o.id, p_worker: null }), 'أُلغي الإسناد') }, 'إلغاء الإسناد'))));
+      card.append(h('hr'), h('label', {}, 'العامل (لإسناد الطلب له، أو لاحتساب حصته إن أكّدت بنفسك)'), ws,
         h('div', { style: 'display:flex;gap:8px;margin-top:10px' },
-          h('button', { class: 'btn pri', onclick: () => confirm('تأكيد أن عملية الكراء تمت؟') && act(() => rpc('admin_confirm_order', { p_order: o.id, p_worker: ws.value ? +ws.value : null }), 'تم تأكيد الكراء') }, '✅ تأكيد عملية الكراء'),
+          h('button', { class: 'btn pri', onclick: async () => {
+            if (!confirm('تأكيد أن عملية الكراء تمت؟')) return;
+            try {
+              await rpc('admin_confirm_order', { p_order: o.id, p_worker: ws.value ? +ws.value : null });
+              toast('تم تأكيد الكراء'); render();
+              showMsgs('تم التأكيد — أبلغ الطرفين', [['💬 أبلغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, false))], ['💬 أبلغ الزبون', wa(o.client_phone, clientApprovedMsg(o))]]);
+            } catch (e) { toast(e.message, false); }
+          } }, '✅ تأكيد بنفسي'),
+          h('button', { class: 'btn', onclick: async () => {
+            if (!ws.value) return toast('اختر العامل أولاً', false);
+            try {
+              await rpc('admin_assign_order', { p_order: o.id, p_worker: +ws.value });
+              toast('تم إسناد الطلب للعامل'); render();
+              const w = active.find(x => String(x.id) === ws.value);
+              showMsgs('أبلغ العامل بمهمته', [['💬 أبلغ ' + w.name, wa(w.phone, `السلام عليكم ${w.name}، لديك مهمة جديدة: طلب #${o.id} — ${o.listing_title} (${period(o)}). ادخل صفحتك لدراسته: ${workerLink()} (عقارات سوف)`)]]);
+            } catch (e) { toast(e.message, false); }
+          } }, '📤 إسناد للعامل'),
           h('button', { class: 'btn red', onclick: () => confirm('إلغاء الطلب؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الطلب')));
     }
     root.append(card);
@@ -125,7 +137,7 @@ async function ordersView() {
 }
 
 // ---------------- العروض ----------------
-function ownerMsg(l) {
+function listingOwnerMsg(l) {
   const link = new URL('status.html?t=' + l.track_token, location.href).href;
   const intl = l.owner_phone.startsWith('0') ? '213' + l.owner_phone.slice(1) : l.owner_phone.replace('+', '');
   const txt = `السلام عليكم، بخصوص عرضك (${l.title}). تتابع حالته من هذا الرابط الخاص: ${link}`;
@@ -154,10 +166,42 @@ async function listingsView() {
         h('div', { style: 'display:flex;gap:6px;margin-top:8px;flex-wrap:wrap' },
           l.status !== 'active' ? h('button', { class: 'btn pri sm', onclick: () => setStatus(l.id, 'active', 'تم النشر') }, 'نشر') : null,
           l.status === 'active' ? h('button', { class: 'btn sm', onclick: () => setStatus(l.id, 'hidden') }, 'إخفاء') : null,
-          h('a', { class: 'btn sm', style: 'text-decoration:none', target: '_blank', rel: 'noopener', href: ownerMsg(l) }, '💬 واتساب للمالك'),
+          h('a', { class: 'btn sm', style: 'text-decoration:none', target: '_blank', rel: 'noopener', href: listingOwnerMsg(l) }, '💬 واتساب للمالك'),
           h('button', { class: 'btn red sm', onclick: () => del(l) }, 'حذف')))));
   }
   root.append(grid);
+  return root;
+}
+
+// ---------------- طلبات العمل ----------------
+async function appsView() {
+  const [apps, rate] = await Promise.all([ok(sb.from('worker_applications').select('*').order('id', { ascending: false })), rpc('get_rate')]);
+  const max = Number(rate), root = h('div');
+  root.append(h('div', { class: 'note' }, 'التحكم بفتح/إيقاف استقبال الطلبات من تبويب «الإعدادات».'));
+  if (!apps.length) root.append(h('div', { class: 'empty' }, 'لا توجد طلبات عمل.'));
+  for (const x of apps) {
+    const r = h('input', { type: 'number', step: '0.1', min: 0, max, value: max / 2, style: 'width:90px' });
+    const card = h('div', { class: 'card pad' },
+      h('div', {}, h('b', {}, x.first_name + ' ' + x.last_name + ' '), h('span', { class: 'badge ' + (x.status === 'approved' ? 'active' : x.status === 'rejected' ? 'cancelled' : 'pending') }, { pending: 'قيد الدراسة', approved: 'مقبول', rejected: 'مرفوض' }[x.status])),
+      kv([['تاريخ الميلاد', fd(x.birth_date)], ['الهاتف', tel(x.phone)], ['التقديم', fdate(x.created_at)]]));
+    if (x.status === 'pending') card.append(h('hr'), h('label', {}, 'نسبة العامل % من سعر الشقة (من أصل ' + max + '%)'), r,
+      h('div', { style: 'display:flex;gap:8px;margin-top:10px' },
+        h('button', { class: 'btn pri', onclick: async () => {
+          if (!confirm('قبول هذا العامل؟')) return;
+          try {
+            await rpc('admin_review_application', { p_app: x.id, p_approve: true, p_rate: +r.value }); toast('تم القبول'); render();
+            showMsgs('أبلغ العامل بالقبول', [['💬 أرسل رابط صفحته', wa(x.phone, `السلام عليكم ${x.first_name}، تم قبول طلبك للعمل معنا في عقارات سوف ✅. نسبتك ${r.value}% من سعر الشقة في كل عملية. ادخل صفحتك بالبريد وكلمة السر التي سجّلت بها: ${workerLink()}`)]]);
+          } catch (e) { toast(e.message, false); }
+        } }, '✅ قبول'),
+        h('button', { class: 'btn red', onclick: async () => {
+          if (!confirm('رفض هذا الطلب؟')) return;
+          try {
+            await rpc('admin_review_application', { p_app: x.id, p_approve: false }); toast('تم الرفض'); render();
+            showMsgs('أبلغ صاحب الطلب بالرفض', [['💬 أرسل الرد', wa(x.phone, `السلام عليكم ${x.first_name}، نعتذر، لم يُقبل طلبك للعمل في عقارات سوف حالياً. شكراً لاهتمامك.`)]]);
+          } catch (e) { toast(e.message, false); }
+        } }, '❌ رفض')));
+    root.append(card);
+  }
   return root;
 }
 
@@ -172,7 +216,7 @@ async function workersView() {
   const name = h('input', { required: true, maxlength: 80 });
   const phone = h('input', { type: 'tel', required: true });
   const r0 = h('input', { type: 'number', step: '0.1', min: 0, max, value: max / 2, required: true });
-  const f = h('form', { class: 'card pad' }, h('h3', {}, 'إضافة عامل جديد'),
+  const f = h('form', { class: 'card pad' }, h('h3', {}, 'إضافة عامل يدوياً (بدون حساب دخول)'),
     h('div', { class: 'row' }, h('div', {}, h('label', {}, 'الاسم'), name), h('div', {}, h('label', {}, 'الهاتف'), phone)),
     h('label', {}, `نسبة العامل من سعر الشقة % (من أصل ${max}% عمولة الوساطة)`), r0,
     h('button', { class: 'btn pri', style: 'margin-top:10px' }, 'اعتماد العامل'));
@@ -190,7 +234,7 @@ async function workersView() {
       kv([['الهاتف', tel(w.phone)], ['طلبات مستلمة المبلغ', s.done], ['مستحقاته الإجمالية', money(s.earned)]]),
       h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
         h('label', { style: 'margin:0' }, 'النسبة %'), r,
-        h('label', { style: 'margin:0;font-weight:400' }, a, ' معتمد'),
+        h('label', { style: 'margin:0;font-weight:400' }, a, ' معتمد (بإلغاء التحديد يُمنع من الدخول فوراً)'),
         h('button', { class: 'btn pri sm', onclick: () => act(() => ok(sb.from('workers').update({ rate_pct: +r.value, active: a.checked }).eq('id', w.id)), 'تم الحفظ') }, 'حفظ'))));
   }
   if (!ws.length) root.append(h('div', { class: 'empty' }, 'لا يوجد عمال بعد.'));
@@ -251,7 +295,13 @@ async function settingsView() {
   f3.onsubmit = e => { e.preventDefault(); act(() => ok(sb.from('settings').update({
     notify_telegram_token: tt.value.trim() || null, notify_telegram_chat: tc.value.trim() || null,
     notify_wa_phone: wp.value.trim() || null, notify_wa_key: wk.value.trim() || null }).eq('id', 1)), 'تم حفظ الإشعارات'); };
-  return h('div', {}, f1, f3, f2);
+  const open = await workerAppsOpen();
+  const sw = h('input', { type: 'checkbox' }); sw.checked = !!open;
+  sw.onchange = () => act(() => ok(sb.from('settings').update({ worker_apps_open: sw.checked }).eq('id', 1)), sw.checked ? 'فُتح استقبال طلبات العمل' : 'أُوقف استقبال طلبات العمل');
+  const f4 = h('div', { class: 'card pad' }, h('h3', {}, '👷 طلبات العمل'),
+    h('label', { style: 'font-weight:400' }, sw, ' استقبال طلبات العمل مفتوح (تظهر أيقونة «طلب العمل» للزوار)'),
+    h('div', { class: 'muted' }, 'عند الإيقاف تختفي الأيقونة ولا يُقبل أي طلب جديد.'));
+  return h('div', {}, f4, f1, f3, f2);
 }
 
 async function boot() {

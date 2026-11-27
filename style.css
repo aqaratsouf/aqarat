@@ -60,3 +60,20 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:20px}
 .row-sum b{white-space:nowrap;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .row-sum.plus b{color:var(--gold)}
 .row-sum.total{border-top:2px solid var(--g2);margin-top:6px;padding-top:8px;font-weight:700;font-size:18px;color:var(--g2)}
+
+/* ===== عقارات سوف: الرئيسية والحسابات ===== */
+:root{--navy:#0b2a5b;--gold2:#c8922a}
+header.top{background:linear-gradient(90deg,var(--navy),#123d7c)}
+header.top h1{color:#fff}header.top h1 small{color:#f3d58a;font-weight:400;font-size:14px;margin-inline-start:6px}
+.banner{width:100%;display:block;border-radius:14px;box-shadow:0 4px 18px rgba(11,42,91,.2)}
+.choose{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+@media(max-width:560px){.choose{grid-template-columns:1fr}}
+.pick{display:block;text-decoration:none;color:#fff;background:linear-gradient(135deg,var(--navy),#1b4f9c);border-radius:16px;padding:24px 18px;text-align:center;cursor:pointer;border:0;font:inherit;width:100%;box-shadow:0 4px 14px rgba(11,42,91,.25)}
+.pick.gold{background:linear-gradient(135deg,#a86f12,var(--gold2))}
+.pick .ic{font-size:44px;display:block}.pick b{font-size:20px;display:block;margin:6px 0 2px}.pick span{font-size:14px;opacity:.9}
+.side{position:fixed;inset-inline-end:0;top:45%;z-index:5;background:var(--gold2);color:#fff;text-decoration:none;padding:10px 12px;border-radius:12px 0 0 12px;font-size:13px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+html[dir=rtl] .side{border-radius:0 12px 12px 0}
+.side span{display:block;font-size:22px}
+.auth{max-width:420px;margin:24px auto}
+.step{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;background:#e2eceb}
+.step.wait{background:#fde68a}.step.go{background:#bfdbfe}.step.done{background:#bbf7d0}.step.no{background:#fecaca}

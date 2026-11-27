@@ -1,6 +1,6 @@
 {
-  "name": "عقارات — كراء الشقق بواد سوف",
-  "short_name": "عقارات",
+  "name": "عقارات سوف — كراء الشقق بالوادي",
+  "short_name": "عقارات سوف",
   "description": "وساطة في كراء الشقق المجهزة باليوم وغير المجهزة بالشهر",
   "lang": "ar",
   "dir": "rtl",
@@ -8,7 +8,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f7f6",
-  "theme_color": "#0f766e",
+  "theme_color": "#0b2a5b",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
