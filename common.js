@@ -19,8 +19,9 @@ function h(tag, attrs, ...kids) {
 }
 
 const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-const money = n => fmt(n) + '\u00A0DA';
-const fdate = t => new Date(t).toLocaleString('ar-DZ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' });
+// المبلغ معزول بالكامل (LRI..PDI) كي لا يغيّر النص العربي ترتيب أرقامه أبداً
+const money = n => '\u2066' + fmt(n) + '\u00A0DA' + '\u2069';
+const fdate = t => '\u2066' + new Date(t).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) + '\u2069';
 const withRate = (price, rate) => price + Math.floor(price * rate / 100 + 0.5);
 
 // رسائل الخطأ العربية القادمة من قاعدة البيانات تُعرض كما هي، وغيرها برسالة عامة
