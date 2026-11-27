@@ -131,6 +131,7 @@ async function ordersView() {
           } }, '📤 إسناد للعامل'),
           h('button', { class: 'btn red', onclick: () => confirm('إلغاء الطلب؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الطلب')));
     }
+    card.append(h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn red sm', onclick: () => confirm('حذف هذا الطلب نهائياً؟ سيُمحى كأنه لم يحدث، ويُسحب من الحسابات والتواريخ المحجوزة، ويُعاد استخدام رقمه.') && act(() => rpc('admin_delete_order', { p_order: o.id }), 'تم حذف الطلب نهائياً') }, '🗑️ حذف نهائي')));
     root.append(card);
   }
   return root;
@@ -147,11 +148,12 @@ async function listingsView() {
   const [ls, rate] = await Promise.all([ok(sb.from('listings').select('*').order('id', { ascending: false })), rpc('get_rate')]);
   const setStatus = (id, status, msg) => act(() => ok(sb.from('listings').update({ status }).eq('id', id)), msg);
   const del = async l => {
-    if (!confirm('حذف العرض نهائياً؟')) return;
+    if (!confirm('حذف العرض نهائياً؟ لن يظهر لأحد ولن يبقى له أثر، وسيُعاد استخدام رقمه.')) return;
+    const withOrders = confirm('هل تحذف معه كل الطلبات المرتبطة به (كأن شيئاً لم يحدث)؟\nموافق = احذفها أيضاً · إلغاء = أبقِ الطلبات في السجل');
     await act(async () => {
-      await ok(sb.from('listings').delete().eq('id', l.id));
-      await sb.storage.from('listing-photos').remove(l.photos.map(p => p.file)); // تنظيف الصور (لا يمنع الحذف إن فشل)
-    });
+      const photos = await rpc('admin_delete_listing', { p_listing: l.id, p_with_orders: withOrders });
+      await sb.storage.from('listing-photos').remove((photos || []).map(p => p.file)); // تنظيف الصور (لا يمنع الحذف إن فشل)
+    }, 'تم الحذف نهائياً');
   };
   const root = h('div');
   if (!ls.length) root.append(h('div', { class: 'empty' }, 'لا توجد عروض.'));
@@ -167,7 +169,7 @@ async function listingsView() {
           l.status !== 'active' ? h('button', { class: 'btn pri sm', onclick: () => setStatus(l.id, 'active', 'تم النشر') }, 'نشر') : null,
           l.status === 'active' ? h('button', { class: 'btn sm', onclick: () => setStatus(l.id, 'hidden') }, 'إخفاء') : null,
           h('a', { class: 'btn sm', style: 'text-decoration:none', target: '_blank', rel: 'noopener', href: listingOwnerMsg(l) }, '💬 واتساب للمالك'),
-          h('button', { class: 'btn red sm', onclick: () => del(l) }, 'حذف')))));
+          h('button', { class: 'btn red sm', onclick: () => del(l) }, '🗑️ حذف نهائي')))));
   }
   root.append(grid);
   return root;
