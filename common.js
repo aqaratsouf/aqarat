@@ -108,10 +108,11 @@ const period = o => `من ${fd(o.start_date)} إلى ${fd(o.end_date)}`;
 const unitWord = o => o.kind === 'furnished' ? 'يوم' : 'شهر';
 // رسالة لصاحب الشقة: تم كراء سكنك
 const ownerMsg = (o, paid) => `السلام عليكم ${o.owner_name}، ${paid ? 'تم تسليم المبلغ و' : ''}تم كراء شقتك «${o.listing_title}» من طرف الزبون ${o.client_name} (هاتفه: ${o.client_phone}) لمدة ${o.units} ${unitWord(o)} ${period(o)}. المبلغ المستحق لك: ${money(o.owner_total)}. نرجو تنبيه الزبون على الحفاظ على نظافة الشقة وتجهيزاتها. (عقارات سوف)`;
-// رسالة للزبون عند الموافقة
-const clientApprovedMsg = o => `السلام عليكم ${o.client_name}، تمت الموافقة على حجزك «${o.listing_title}» ${period(o)}. المبلغ الإجمالي المطلوب منك: ${money(o.total)}. سلّمه للوسيط وسنرسل لك رقم صاحب الشقة. (عقارات سوف)`;
+// رسالة للزبون عند الموافقة: المبلغ للوسيط والمبلغ لصاحب الشقة كلٌّ على حدة
+const splitLines = o => `\n• تسلّم للوسيط: ${money(o.commission)}\n• تسلّم لصاحب الشقة: ${money(o.owner_total)}\n• المجموع: ${money(o.total)}\n`;
+const clientApprovedMsg = o => `السلام عليكم ${o.client_name}، تمت الموافقة على حجزك «${o.listing_title}» ${period(o)}.\nالمبالغ المطلوبة منك:${splitLines(o)}سلّم مبلغ الوسيط وسنرسل لك رقم صاحب الشقة. (عقارات سوف)`;
 // رسالة للزبون عند تسليم المبلغ
-const clientPaidMsg = o => `السلام عليكم ${o.client_name}، تم حجز الشقة «${o.listing_title}» ${period(o)}. المبلغ المستحق لصاحب الشقة: ${money(o.owner_total)}. رقم صاحب الشقة للتواصل المباشر: ${o.owner_name} ${o.owner_phone}. العنوان: ${o.address}. نتمنى لكم إقامة طيبة. (عقارات سوف)`;
+const clientPaidMsg = o => `السلام عليكم ${o.client_name}، تم حجز الشقة «${o.listing_title}» ${period(o)}.\nالمبالغ:${splitLines(o)}رقم صاحب الشقة للتواصل المباشر: ${o.owner_name} ${o.owner_phone}\nالعنوان: ${o.address}\nنتمنى لكم إقامة طيبة. (عقارات سوف)`;
 
 // نافذة فيها أزرار واتساب جاهزة
 function showMsgs(title, items) {
