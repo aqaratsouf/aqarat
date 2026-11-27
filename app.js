@@ -42,7 +42,28 @@ function openListing(l) {
   if (l.photos.length) show(0);
 
   // ----- نموذج الحجز (بدون أي وثائق) -----
-  const units = h('input', { type: 'number', min: 1, max: l.kind === 'furnished' ? 365 : 24, value: 1, required: true });
+  const today = iso(new Date());
+  const furn = l.kind === 'furnished';
+  const d1 = h('input', { type: 'date', min: today, required: true });
+  const d2 = h('input', { type: 'date', min: today, required: furn });
+  const units = h('input', { type: 'number', min: 1, max: 24, value: 1, required: !furn });
+  const booked = h('div', { class: 'note', style: 'display:none' });
+  const warn = h('div', { class: 'note', style: 'display:none;background:#fee2e2;color:#991b1b' });
+  let ranges = [];
+  rpc('public_booked_ranges', { p_listing: l.id }).then(r => {
+    ranges = r || [];
+    if (ranges.length) {
+      booked.style.display = '';
+      booked.replaceChildren('📅 تواريخ محجوزة مسبقاً: ', ...ranges.map(x => h('div', {}, 'من ' + fd(x.start_date) + ' إلى ' + fd(x.end_date))));
+    }
+    upd();
+  }).catch(() => {});
+  const range = () => {
+    if (!d1.value) return null;
+    if (furn) return d2.value && d2.value > d1.value ? [d1.value, d2.value, Math.round((new Date(d2.value) - new Date(d1.value)) / 864e5)] : null;
+    const u = parseInt(units.value) || 0;
+    return u >= 1 && u <= 24 ? [d1.value, addMonths(d1.value, u), u] : null;
+  };
   const sum = h('div', { class: 'sum' });
   const comps = h('div');
   const name = h('input', { required: true, maxlength: 80, autocomplete: 'name' });
@@ -51,13 +72,17 @@ function openListing(l) {
   const btn = h('button', { class: 'btn pri', type: 'submit', style: 'width:100%;margin-top:8px' }, 'تأكيد طلب الحجز');
 
   function upd() {
-    const u = Math.max(0, parseInt(units.value) || 0);
-    sum.replaceChildren(
+    const r = range(), u = r ? r[2] : 0;
+    const hit = r && ranges.find(x => x.start_date < r[1] && r[0] < x.end_date);
+    warn.style.display = hit ? '' : 'none';
+    if (hit) warn.textContent = '⛔ هذه التواريخ محجوزة للأسف (من ' + hit.start_date.split('-').reverse().join('/') + ' إلى ' + hit.end_date.split('-').reverse().join('/') + '). يرجى تغيير التاريخ.';
+    sum.replaceChildren(...(r && !furn ? [h('div', {}, h('span', {}, 'تنتهي في'), h('span', {}, fd(r[1])))] : []),
       h('div', {}, h('span', {}, 'سعر ' + K.unit + ' واحد'), h('span', {}, money(l.client_price))),
       h('div', {}, h('span', {}, K.units), h('span', {}, u)),
       h('div', { class: 'tot' }, h('span', {}, 'السعر الإجمالي'), h('span', {}, money(l.client_price * u))));
   }
-  units.addEventListener('input', upd);
+  [units, d1, d2].forEach(x => x.addEventListener('input', upd));
+  d1.addEventListener('input', () => { if (d1.value) d2.min = addDays(d1.value, 1); });
 
   function addComp() {
     const c = h('div', { class: 'comp' },
@@ -75,7 +100,10 @@ function openListing(l) {
     h('div', { class: 'row' },
       h('div', {}, h('label', {}, 'الاسم واللقب'), name),
       h('div', {}, h('label', {}, 'رقم الهاتف'), tel)),
-    h('label', {}, K.units), units, sum,
+    furn
+      ? h('div', { class: 'row' }, h('div', {}, h('label', {}, 'من تاريخ (يوم/شهر/سنة)'), d1), h('div', {}, h('label', {}, 'إلى تاريخ (يوم/شهر/سنة)'), d2))
+      : [h('label', {}, 'تاريخ بداية الكراء'), d1, h('label', {}, K.units), units],
+    booked, warn, sum,
     h('h4', {}, 'المرافقون'),
     h('div', { class: 'muted' }, 'أضف كل شخص سيقيم معك، مع اسمه ولقبه وصفة قرابته.'),
     comps,
@@ -94,9 +122,10 @@ function openListing(l) {
         return { name: g('name'), surname: g('surname'), relation: g('relation') };
       });
       const res = await rpc('create_order', { p: {
-        listing_id: l.id, units: parseInt(units.value), client_name: name.value, client_phone: tel.value, companions } });
+        listing_id: l.id, start_date: d1.value, end_date: furn ? d2.value : undefined, units: furn ? undefined : parseInt(units.value), client_name: name.value, client_phone: tel.value, companions } });
       form.replaceChildren(h('div', { class: 'sum' },
         h('h3', {}, '✅ تم استلام طلبك رقم ' + res.id),
+        h('p', {}, 'من ' + fd(res.start_date) + ' إلى ' + fd(res.end_date)),
         h('p', {}, 'المبلغ الإجمالي: ' + money(res.total)),
         h('p', {}, 'سنتصل بك قريباً على الرقم ' + tel.value + ' لتأكيد الحجز.')));
     } catch (e) { toast(e.message, false); btn.disabled = false; btn.textContent = 'تأكيد طلب الحجز'; }

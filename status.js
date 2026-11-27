@@ -17,7 +17,9 @@ async function card(token, fallbackTitle) {
       h('div', { style: 'font-weight:700' }, r.title),
       h('div', { class: 'muted' }, KL[r.kind]),
       h('div', { style: 'margin:8px 0' }, h('span', { class: 'badge ' + st.cls }, st.icon + ' ' + st.text)),
-      h('div', {}, st.note));
+      h('div', {}, st.note),
+      (r.bookings || []).length ? h('div', { class: 'note', style: 'margin-top:10px' }, h('b', {}, '📅 حجوزات مؤكدة:'),
+        r.bookings.map(b => h('div', {}, 'من ' + fd(b.start) + ' إلى ' + fd(b.end) + ' — ' + b.persons + ' شخص'))) : null);
   } catch (e) { return h('div', { class: 'card pad' }, e.message); }
 }
 

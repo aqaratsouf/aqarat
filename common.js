@@ -11,7 +11,7 @@ function h(tag, attrs, ...kids) {
     else if (v === true) e.setAttribute(k, '');
     else if (v !== false && v != null) e.setAttribute(k, v);
   }
-  for (const c of kids.flat()) {
+  for (const c of kids.flat(Infinity)) {
     if (c == null || c === false) continue;
     e.append(c.nodeType ? c : document.createTextNode(String(c)));
   }
@@ -22,6 +22,10 @@ const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0'
 // المبلغ معزول بالكامل (LRI..PDI) كي لا يغيّر النص العربي ترتيب أرقامه أبداً
 const money = n => '\u2066' + fmt(n) + '\u00A0DA' + '\u2069';
 const fdate = t => '\u2066' + new Date(t).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) + '\u2069';
+const fd = d => { const [y, m, dd] = String(d).slice(0, 10).split('-'); return '\u2066' + dd + '/' + m + '/' + y + '\u2069'; };
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return iso(d); };
+const addMonths = (s, n) => { const d = new Date(s + 'T00:00:00'), day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); return iso(d); };
 const withRate = (price, rate) => price + Math.floor(price * rate / 100 + 0.5);
 
 // رسائل الخطأ العربية القادمة من قاعدة البيانات تُعرض كما هي، وغيرها برسالة عامة
