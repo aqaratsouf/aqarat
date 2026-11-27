@@ -129,7 +129,8 @@ const workerAppsOpen = () => rpc('worker_apps_open').catch(() => false);
 function setNav(items) {
   $('#nav').replaceChildren(...items.map(([label, href, fn]) => h('a', { href: href || '#', onclick: fn ? (e => { e.preventDefault(); fn(); }) : null }, label)));
 }
-// أيقونة جانبية «طلب العمل» تظهر فقط عندما يفعّلها المدير
+// زر «طلب العمل» في شريط الأعلى بجانب الإدارة: يظهر فقط عندما يفعّله المدير
 async function sideWorker() {
-  if (await workerAppsOpen()) document.body.append(h('a', { class: 'side', href: 'worker.html' }, h('span', {}, '👷'), 'طلب', h('br'), 'العمل'));
+  const nav = $('#nav');
+  if (nav && !nav.querySelector('.wk') && await workerAppsOpen()) nav.append(h('a', { class: 'wk', href: 'worker.html' }, '👷 طلب العمل'));
 }
