@@ -19,7 +19,7 @@ function h(tag, attrs, ...kids) {
 }
 
 const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-const money = n => fmt(n) + '\u00A0دج';
+const money = n => fmt(n) + '\u00A0DA';
 const fdate = t => new Date(t).toLocaleString('ar-DZ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' });
 const withRate = (price, rate) => price + Math.floor(price * rate / 100 + 0.5);
 

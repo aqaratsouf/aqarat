@@ -19,12 +19,12 @@ const btn = h('button', { class: 'btn pri', type: 'submit', style: 'width:100%;m
 
 function unitWord() { return kindSel.value === 'furnished' ? 'اليوم' : 'الشهر'; }
 function upd() {
-  priceLabel.textContent = `سعر الكراء المطلوب (دج) في ${unitWord()}`;
+  priceLabel.textContent = `سعر الكراء المطلوب (DA) في ${unitWord()}`;
   const p = parseInt(price.value) || 0, fee = withRate(p, RATE) - p;
   preview.replaceChildren(
     h('div', { class: 'row-sum' }, h('span', {}, 'سعرك (يصلك كاملاً)'), h('b', {}, money(p))),
     h('div', { class: 'row-sum plus' }, h('span', {}, `+ مبلغ الوسيط (${RATE}%)`), h('b', {}, money(fee))),
-    h('div', { class: 'row-sum total' }, h('span', {}, '= المجموع الذي يدفعه الزبون'), h('b', {}, money(p + fee))));
+    h('div', { class: 'row-sum total' }, h('span', {}, '= المجموع للزبون'), h('b', {}, money(p + fee))));
 }
 price.addEventListener('input', upd); kindSel.addEventListener('change', upd);
 
