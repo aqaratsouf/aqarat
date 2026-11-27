@@ -22,10 +22,9 @@ function upd() {
   priceLabel.textContent = `سعر الكراء المطلوب (دج) في ${unitWord()}`;
   const p = parseInt(price.value) || 0, fee = withRate(p, RATE) - p;
   preview.replaceChildren(
-    h('div', {}, h('span', {}, 'سعرك'), h('span', {}, money(p))),
-    h('div', {}, h('span', {}, `نسبة الوساطة (${RATE}%)`), h('span', {}, '+ ' + money(fee))),
-    h('div', { class: 'tot' }, h('span', {}, 'السعر الذي سيراه الزبون'), h('span', {}, money(p + fee))),
-    h('div', { class: 'muted' }, `تستلم أنت ${money(p)} كاملاً، والنسبة تُضاف على الزبون.`));
+    h('div', { class: 'row-sum' }, h('span', {}, 'سعرك (يصلك كاملاً)'), h('b', {}, money(p))),
+    h('div', { class: 'row-sum plus' }, h('span', {}, `+ مبلغ الوسيط (${RATE}%)`), h('b', {}, money(fee))),
+    h('div', { class: 'row-sum total' }, h('span', {}, '= المجموع الذي يدفعه الزبون'), h('b', {}, money(p + fee))));
 }
 price.addEventListener('input', upd); kindSel.addEventListener('change', upd);
 

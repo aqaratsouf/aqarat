@@ -54,3 +54,9 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:20px}
 .sum div span:last-child{white-space:nowrap;direction:ltr;unicode-bidi:isolate;text-align:left}
 .sum .tot span:first-child{flex:1}
 .price{white-space:nowrap}
+
+/* عملية جمع واضحة: سعر المالك + مبلغ الوسيط = المجموع */
+.row-sum{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0}
+.row-sum b{white-space:nowrap;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.row-sum.plus b{color:var(--gold)}
+.row-sum.total{border-top:2px solid var(--g2);margin-top:6px;padding-top:8px;font-weight:700;font-size:18px;color:var(--g2)}
