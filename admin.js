@@ -121,7 +121,7 @@ async function ordersView() {
           h('button', { class: 'btn red', onclick: () => confirm('إلغاء الطلب؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الطلب')));
     }
     card.append(h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn red sm', onclick: () => confirm('حذف هذا الطلب نهائياً؟ سيُمحى كأنه لم يحدث، ويُسحب من الحسابات والتواريخ المحجوزة، ويُعاد استخدام رقمه.') && act(() => rpc('admin_delete_order', { p_order: o.id }), 'تم حذف الطلب نهائياً') }, '🗑️ حذف نهائي')));
-    const det = h('tr', { style: o.status === 'new' ? '' : 'display:none' }, h('td', { colspan: 12, style: 'background:#f6faf9' }, card));
+    const det = h('tr', { style: o.status === 'new' ? '' : 'display:none' }, h('td', { colspan: 14, style: 'background:#f6faf9' }, card));
     const stBadge = h('span', { class: 'badge ' + (o.paid ? 'active' : o.status) }, o.paid ? '💰 مدفوع' : o.status === 'confirmed' ? '✅ مؤكد — لم يُسلَّم' : ST[o.status]);
     tbody.append(h('tr', {},
       h('td', {}, '#' + o.id, h('div', { class: 'muted', style: 'font-size:11px' }, fdate(o.created_at))),
@@ -132,6 +132,10 @@ async function ordersView() {
       h('td', {}, money(o.total)),
       h('td', {}, money(o.owner_total)),
       h('td', {}, money(o.commission), h('div', { class: 'muted', style: 'font-size:11px' }, o.rate_pct + '%')),
+      h('td', {}, o.workers ? o.workers.name : h('span', { class: 'muted' }, o.status === 'cancelled' ? '—' : 'بدون عامل')),
+      h('td', {}, o.workers && o.status !== 'cancelled'
+        ? [money(o.status === 'new' ? cutFor(o, active.find(w => w.id === o.worker_id)?.rate_pct || 0) : o.worker_cut), o.status === 'new' ? h('div', { class: 'muted', style: 'font-size:11px' }, 'متوقعة') : null]
+        : h('span', { class: 'muted' }, '—')),
       h('td', {}, o.owner_name, h('div', {}, tel(o.owner_phone))),
       h('td', {}, profitSpan),
       h('td', {}, stBadge),
@@ -139,7 +143,7 @@ async function ordersView() {
     tbody.append(det);
   }
   if (list.length) root.append(h('div', { style: 'overflow-x:auto' }, h('table', { class: 'tbl' },
-    h('thead', {}, h('tr', {}, ['رقم', 'الزبون', 'العرض', 'المدة', 'تاريخ الحجز', 'الإجمالي (يدفعه الزبون)', 'لصاحب الشقة', 'العمولة', 'صاحب الشقة', 'فائدتي', 'الحالة', ''].map(x => h('th', {}, x)))), tbody)));
+    h('thead', {}, h('tr', {}, ['رقم', 'الزبون', 'العرض', 'المدة', 'تاريخ الحجز', 'الإجمالي (يدفعه الزبون)', 'لصاحب الشقة', 'العمولة', 'العامل المكلّف', 'حصة العامل', 'صاحب الشقة', 'فائدتي', 'الحالة', ''].map(x => h('th', {}, x)))), tbody)));
   return root;
 }
 
