@@ -1,4 +1,4 @@
-const TABS = { orders: 'الطلبات', listings: 'العروض', apps: 'طلبات العمل', workers: 'العمال', settings: 'الإعدادات' };
+const TABS = { orders: 'الطلبات', listings: 'العروض', users: 'المستخدمون', apps: 'طلبات العمل', workers: 'العمال', settings: 'الإعدادات' };
 const ST = { new: 'جديد', confirmed: 'مؤكد', paid: 'مدفوع', cancelled: 'ملغى', pending: 'بانتظار المراجعة', active: 'منشور', hidden: 'مخفي' };
 const KL = { furnished: 'مجهزة (باليوم)', unfurnished: 'غير مجهزة (بالشهر)' };
 const app = $('#app');
@@ -34,7 +34,7 @@ function nav() {
 async function render() {
   nav();
   app.replaceChildren(h('div', { class: 'empty' }, 'جاري التحميل...'));
-  try { app.replaceChildren(await ({ orders: ordersView, listings: listingsView, apps: appsView, workers: workersView, settings: settingsView })[tab]()); }
+  try { app.replaceChildren(await ({ orders: ordersView, listings: listingsView, users: usersView, apps: appsView, workers: workersView, settings: settingsView })[tab]()); }
   catch (e) { app.replaceChildren(h('div', { class: 'empty' }, e.message)); }
 }
 
@@ -172,6 +172,48 @@ async function listingsView() {
           h('button', { class: 'btn red sm', onclick: () => del(l) }, '🗑️ حذف نهائي')))));
   }
   root.append(grid);
+  return root;
+}
+
+// ---------------- المستخدمون (زبائن وأصحاب شقق) ----------------
+const ORD_ST = o => o.status === 'cancelled' ? 'ملغى' : o.paid ? 'تم تسليم المبلغ' : o.status === 'confirmed' ? 'مؤكد' : 'قيد الانتظار';
+async function usersView() {
+  const us = await rpc('admin_users');
+  const root = h('div'), body = h('tbody');
+  const q = h('input', { placeholder: '🔎 بحث بالاسم أو الهاتف أو البريد', style: 'margin-bottom:8px' });
+  const draw = () => {
+    const t = q.value.trim().toLowerCase();
+    body.replaceChildren();
+    const list = us.filter(u => !t || (u.full_name + ' ' + u.phone + ' ' + u.email).toLowerCase().includes(t));
+    if (!list.length) body.append(h('tr', {}, h('td', { colspan: 5, class: 'empty' }, 'لا يوجد مستخدمون.')));
+    for (const u of list) {
+      const det = h('tr', { style: 'display:none' }, h('td', { colspan: 5 }, 'جاري التحميل...'));
+      const tags = [u.is_worker ? '👷 عامل' : null, u.listings ? `🏢 صاحب شقة (${u.listings} عرض)` : null,
+        u.requests ? `🔑 استأجر ${u.rentals} مرة من ${u.requests} طلب` : null].filter(Boolean);
+      body.append(h('tr', { style: u.banned ? 'opacity:.6' : '' },
+        h('td', {}, h('b', {}, u.full_name || '—'), u.banned ? h('div', { class: 'badge cancelled' }, 'محظور') : null),
+        h('td', {}, u.phone ? h('a', { class: 'link', href: 'tel:' + u.phone }, u.phone) : '—'),
+        h('td', { dir: 'ltr', style: 'font-size:12px' }, u.email),
+        h('td', {}, tags.length ? tags.map(x => h('div', {}, x)) : '—'),
+        h('td', { style: 'white-space:nowrap' },
+          h('button', { class: 'btn sm', onclick: async () => {
+            if (det.style.display !== 'none') return (det.style.display = 'none');
+            det.style.display = '';
+            try {
+              const d = await rpc('admin_user_detail', { p_user: u.user_id });
+              det.firstChild.replaceChildren(
+                h('b', {}, 'ما استأجره:'), ...(d.orders.length ? d.orders.map(o => h('div', {}, `#${o.id} ${o.title} — ${fd(o.start)} → ${fd(o.end)} — ${money(o.total)} — ${ORD_ST(o)}`)) : [h('div', { class: 'muted' }, 'لا شيء')]),
+                h('b', {}, 'عروضه:'), ...(d.listings.length ? d.listings.map(l => h('div', {}, `#${l.id} ${l.title} — ${money(l.price)} — ${ST[l.status] || l.status}`)) : [h('div', { class: 'muted' }, 'لا شيء')]));
+            } catch (e) { det.firstChild.textContent = e.message; }
+          } }, 'التفاصيل'),
+          ' ',
+          h('button', { class: 'btn sm ' + (u.banned ? 'pri' : 'red'), onclick: () => confirm(u.banned ? 'فك الحظر عن هذا الشخص؟' : 'حظر هذا الشخص؟ لن يستطيع الحجز أو إضافة عروض، وتختفي عروضه من الموقع حتى فك الحظر.') && act(() => rpc('admin_set_ban', { p_user: u.user_id, p_ban: !u.banned }), u.banned ? 'تم فك الحظر' : 'تم الحظر') }, u.banned ? 'فك الحظر' : '🚫 حظر'))));
+      body.append(det);
+    }
+  };
+  q.oninput = draw; draw();
+  root.append(h('div', { class: 'note' }, `عدد المسجّلين: ${us.length}. ملاحظة: حظر العامل يوقف حسابه، وعند فك الحظر فعّله من تبويب «العمال».`), q,
+    h('div', { style: 'overflow-x:auto' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['الاسم واللقب', 'الهاتف', 'البريد', 'الوضعية', 'إجراءات'].map(x => h('th', {}, x)))), body)));
   return root;
 }
 

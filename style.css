@@ -75,3 +75,6 @@ header.top h1{color:#fff}header.top h1 small{color:#f3d58a;font-weight:400;font-
 .wk{background:rgba(255,255,255,.15)}
 .step{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;background:#e2eceb}
 .step.wait{background:#fde68a}.step.go{background:#bfdbfe}.step.done{background:#bbf7d0}.step.no{background:#fecaca}
+.tbl{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;font-size:14px}
+.tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid #e5eceb;text-align:start;vertical-align:top}
+.tbl th{background:#e8f0ef;white-space:nowrap}

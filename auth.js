@@ -17,7 +17,12 @@ const cleanUrl = () => location.origin + location.pathname;
 async function requireAuth(root, { title, sub }, onReady) {
   const { data: { session } } = await sb.auth.getSession();
   if (RECOVERY && session) return newPasswordForm(root);
-  if (session) return onReady(session.user);
+  if (session) {
+    let banned = false;
+    try { banned = await rpc('my_ban'); } catch {}
+    if (banned) return root.replaceChildren(h('div', { class: 'card pad auth' }, h('h2', {}, '⛔ حسابك محظور'), h('p', {}, 'تم إيقاف حسابك من طرف الإدارة. تواصل معنا إن كان ذلك خطأ.'), h('button', { class: 'btn', onclick: logout }, 'خروج')));
+    return onReady(session.user);
+  }
   let forgot = false;
   const draw = () => {
     const em = h('input', { type: 'email', required: true, autocomplete: 'username', dir: 'ltr', placeholder: 'example@gmail.com' });

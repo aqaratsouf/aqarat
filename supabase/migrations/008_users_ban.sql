@@ -1,0 +1,3 @@
+-- جدول المستخدمين + الحظر (انظر الهجرة المطبّقة users_ban في Supabase)
+-- banned_users(user_id, banned_at) · _is_banned · my_ban · admin_users · admin_user_detail · admin_set_ban
+-- create_order / submit_listing / apply_worker ترفض المحظور، و public_listings تخفي عروض المالك المحظور.
