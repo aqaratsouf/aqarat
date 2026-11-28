@@ -173,6 +173,7 @@ function openListing(l) {
         h('p', {}, 'من ' + fd(res.start_date) + ' إلى ' + fd(res.end_date)),
         h('p', {}, 'المبلغ الإجمالي: ' + money(res.total)),
         h('p', {}, 'سنتصل بك قريباً على الرقم ' + tel.value + ' لتأكيد الحجز.')));
+      rpc('broker_whatsapp').then(p => { if (p) form.firstChild.append(waBtn('💬 أرسل طلبك للوسيط عبر واتساب', wa(p, `السلام عليكم، أنا ${name.value}، أريد حجز «${l.title}» من ${fd(res.start_date)} إلى ${fd(res.end_date)} (طلب رقم ${res.id}). هاتفي: ${tel.value}`), 'btn pri')); }).catch(() => {});
     } catch (e) { toast(e.message, false); btn.disabled = false; btn.textContent = 'تأكيد طلب الحجز'; }
   });
 

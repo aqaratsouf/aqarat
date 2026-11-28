@@ -77,7 +77,12 @@ async function dashboard(st) {
         showMsgs('تم استلام المبلغ — أبلغ الطرفين', [['💬 أبلغ الزبون (مع رقم صاحب الشقة)', wa(o.client_phone, clientPaidMsg(o))], ['💬 أبلغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, true))]]);
       } }, '💰 استلمت المبلغ'),
       h('button', { class: 'btn red', onclick: async () => { const r = await askReason('إلغاء هذا الحجز'); if (r === null) return; await act(() => rpc('worker_cancel', { p_order: o.id, p_reason: r }), 'تم الإلغاء', o); showMsgs('أبلغ الزبون بالإلغاء', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))]]); } }, 'إلغاء'));
-    if (o.paid) row.append(waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o))));
+    if (o.paid) row.append(waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o))),
+      h('button', { class: 'btn red', onclick: async () => {
+        const r = await askReason('التراجع عن استلام المبلغ وإلغاء الطلب (تُلغى فوائده)'); if (r === null) return;
+        await act(() => rpc('worker_revert_paid', { p_order: o.id, p_reason: r }), 'أُلغي الطلب وفوائده', o);
+        showMsgs('أبلغ الطرفين', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))], ['💬 أبلغ صاحب الشقة', wa(o.owner_phone, `السلام عليكم ${o.owner_name}، تم إلغاء حجز «${o.listing_title}» (${period(o)}).${reasonLine(r)}(عقارات سوف)`)]]);
+      } }, '↩️ تراجع عن التسليم'));
     if (row.children.length) card.append(row);
     root.append(card);
   }

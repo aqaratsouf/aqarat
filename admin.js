@@ -89,7 +89,12 @@ async function ordersView() {
       } else {
         wrap.append(h('div', { class: 'muted', style: 'width:100%' }, 'استُلم المبلغ: ' + fdate(o.paid_at)),
           waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o)), 'btn pri sm'),
-          h('button', { class: 'btn sm', onclick: () => confirm('التراجع عن حالة الاستلام؟ سيُخصم من حساباتك.') && act(() => rpc('admin_set_paid', { p_order: o.id, p_paid: false }), 'تم التراجع') }, 'تراجع عن الاستلام'));
+          h('button', { class: 'btn sm', onclick: () => confirm('التراجع عن حالة الاستلام؟ سيُخصم من حساباتك.') && act(() => rpc('admin_set_paid', { p_order: o.id, p_paid: false }), 'تم التراجع') }, 'تراجع عن الاستلام'),
+          h('button', { class: 'btn red sm', onclick: async () => {
+            const r = await askReason('التراجع وإلغاء الطلب (تُلغى فوائده)'); if (r === null) return;
+            await act(() => rpc('admin_revert_paid', { p_order: o.id, p_reason: r }), 'أُلغي الطلب وفوائده');
+            showMsgs('أبلغ الزبون وصاحب الشقة', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))], ['💬 أبلغ صاحب الشقة', wa(o.owner_phone, `السلام عليكم ${o.owner_name}، تم إلغاء حجز «${o.listing_title}» (${period(o)}).${reasonLine(r)}(عقارات سوف)`)]]);
+          } }, '↩️ تراجع وإلغاء الطلب'));
       }
       wrap.append(waBtn('💬 إبلاغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, o.paid))));
       if (o.workers) wrap.append(waBtn('💬 تفاصيل للعامل', wa(o.workers.phone, `طلب #${o.id}: ${o.listing_title} — ${o.address} — ${period(o)} — الزبون ${o.client_name} ${o.client_phone}`)));

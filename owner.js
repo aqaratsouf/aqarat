@@ -12,6 +12,7 @@ async function myListingsView() {
         h('div', {}, h('b', {}, l.title + ' '), h('span', { class: 'step ' + cls }, txt)),
         h('div', { class: 'muted' }, KLB[l.kind] + ' — سعرك: ' + money(l.price)),
         l.status_note ? h('div', { class: 'note' }, 'ملاحظة الإدارة: ' + l.status_note) : null,
+        l.status !== 'active' ? h('button', { class: 'btn pri sm', onclick: () => editListing(l.id) }, '✏️ تعديل وإعادة الإرسال') : null,
         h('h4', {}, 'الحجوزات المؤكدة'),
         l.bookings.length ? l.bookings.map(b => h('div', { class: 'sum' },
           h('div', {}, h('span', {}, 'المدة'), h('span', {}, 'من ' + fd(b.start) + ' إلى ' + fd(b.end))),
@@ -23,13 +24,23 @@ async function myListingsView() {
   } catch (e) { app.replaceChildren(h('div', { class: 'empty' }, e.message)); }
 }
 
+let CUR_USER = null;
+async function editListing(id) {
+  try {
+    const cur = await rpc('get_my_listing', { p_id: id });
+    app.replaceChildren(h('h2', {}, 'تعديل العرض'), h('div', { class: 'muted' }, 'عدّل ما طُلب منك ثم أعد الإرسال ليراجعه المدير.'), addView(CUR_USER, myListingsView, cur));
+  } catch (e) { toast(e.message, false); }
+}
+
 requireAuth(app, { title: 'صاحب الشقة', sub: 'سجّل دخولك أو أنشئ حساباً لتضيف شقتك وتتابع حجوزاتها.' }, user => {
+  CUR_USER = user;
   const add = () => app.replaceChildren(h('h2', {}, 'أضف شقتك للكراء'), h('div', { class: 'muted' }, 'يظهر عرضك بعد مراجعته من طرفنا.'), addView(user, myListingsView));
   setNav([['عروضي', '#', myListingsView], ['+ إضافة عرض', '#', add], ['الرئيسية', 'index.html'], ['خروج', '#', logout]]);
   myListingsView(); sideWorker();
 });
 
-function addView(user, onDone) {
+function addView(user, onDone, edit) {
+let keep = edit ? (edit.photos || []).slice() : [];
 const LABELS = ['غرفة نوم', 'صالون', 'مطبخ', 'حمام', 'مدخل / واجهة', 'أخرى'];
 let RATE = 10, lat = null, lng = null;
 const rowsBox = h('div');
@@ -75,7 +86,10 @@ function addPhoto() {
   row._get = () => ({ sel, file });
   rowsBox.append(row);
 }
-addPhoto();
+if (!edit) addPhoto();
+const keepBox = h('div');
+function drawKeep() { keepBox.replaceChildren(...keep.map((p, i) => h('div', { class: 'photos-row' }, h('span', {}, '🖼️ ' + p.label), h('button', { type: 'button', class: 'btn red sm', onclick: () => { keep.splice(i, 1); drawKeep(); } }, '✕')))); }
+drawKeep();
 
 const form = h('form', { class: 'card pad' });
 form.append(
@@ -88,7 +102,7 @@ form.append(
   priceLabel, price, preview,
   h('h4', {}, 'صور الشقة'),
   h('div', { class: 'muted' }, 'أضف صوراً للغرف والمطبخ والحمام (صورة واحدة على الأقل، حتى 20).'),
-  rowsBox,
+  keepBox, rowsBox,
   h('button', { type: 'button', class: 'btn sm', onclick: () => rowsBox.children.length < 20 && addPhoto() }, '+ إضافة صورة'),
   h('div', { class: 'note' }, '⚠️ نحن غير مسؤولين عمّا يقوم به الزبون داخل الشقة، ولا نتولى مراقبة سلامتها أو نظافتها. عليك تنبيه الزبون بنفسك إلى طلباتك الخاصة، مثل المحافظة على سلامة الشقة ونظافتها.'),
   h('label', { style: 'font-weight:400' }, agree, ' قرأت الملاحظة وأوافق عليها'),
@@ -98,20 +112,22 @@ form.addEventListener('submit', async ev => {
   ev.preventDefault();
   btn.disabled = true; btn.textContent = 'جاري رفع الصور...';
   try {
-    const photos = [];
+    const photos = keep.slice();
     for (const r of rowsBox.children) {
       const { sel, file } = r._get();
       photos.push({ label: sel.value, file: await uploadTo('listing-photos', file.files[0]) });
     }
-    const res = await rpc('submit_listing', { p: {
+    const body = {
       kind: kindSel.value, title: title.value, description: desc.value, owner_name: oname.value, owner_phone: ophone.value,
-      address: addr.value, lat, lng, map_url: mapurl.value, price: parseInt(price.value), photos } });
+      address: addr.value, lat, lng, map_url: mapurl.value, price: parseInt(price.value), photos };
+    if (edit) await rpc('update_my_listing', { p_id: edit.id, p: body }); else await rpc('submit_listing', { p: body });
     form.replaceChildren(h('div', { class: 'sum' }, h('h3', {}, '✅ تم استلام عرضك'),
       h('p', {}, '⏳ حالة العرض الآن: قيد المراجعة. سننشره بعد الموافقة عليه، وتتابع حالته وحجوزاته من «عروضي».'),
       h('button', { type: 'button', class: 'btn pri', onclick: onDone }, 'الذهاب إلى عروضي')));
   } catch (e) { toast(e.message, false); btn.disabled = false; btn.textContent = 'إرسال العرض'; }
 });
 
+if (edit) { kindSel.value = edit.kind; title.value = edit.title; desc.value = edit.description || ''; oname.value = edit.owner_name; ophone.value = edit.owner_phone; addr.value = edit.address; mapurl.value = edit.map_url || ''; price.value = edit.price; lat = edit.lat; lng = edit.lng; agree.checked = true; }
 rpc('get_rate').then(r => { RATE = Number(r); upd(); }).catch(upd);
 upd();
   return form;
