@@ -1,0 +1,5 @@
+-- 012: أسباب الإلغاء (اختيارية). طُبّقت على Supabase باسم "cancel_reasons".
+-- orders.cancel_reason, listings.status_note
+-- admin_cancel_order(p_order, p_reason default null), worker_cancel(p_order, p_reason default null)
+-- admin_set_listing_status(p_listing, p_status, p_reason default null)
+-- my_orders() يُرجع cancel_reason عند الإلغاء؛ my_listings() يُرجع status_note عند الإخفاء.

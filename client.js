@@ -39,6 +39,7 @@ async function ordersView() {
         h('div', { class: 'muted' }, '📍 ' + o.address),
         h('div', {}, period(o) + ' — ' + o.units + ' ' + unitWord(o)),
         h('div', {}, 'المبلغ الإجمالي: ', h('b', {}, money(o.total))),
+        o.status === 'cancelled' && o.cancel_reason ? h('div', { class: 'note' }, 'سبب الإلغاء: ' + o.cancel_reason) : null,
         o.status === 'confirmed' && !o.paid ? h('div', { class: 'note' }, 'عليك الآن تسليم المبلغ الإجمالي للوسيط. بعد استلامه تظهر لك هنا بيانات صاحب الشقة للتواصل المباشر.') : null,
         o.paid ? h('div', { class: 'sum' }, h('div', {}, h('span', {}, 'صاحب الشقة'), h('span', {}, o.owner_name)),
           h('div', {}, h('span', {}, 'هاتفه'), h('a', { class: 'link', href: 'tel:' + o.owner_phone }, o.owner_phone))) : null);

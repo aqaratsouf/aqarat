@@ -69,14 +69,14 @@ async function dashboard(st) {
         await act(() => rpc('worker_confirm', { p_order: o.id }), 'تم تأكيد الطلب', o);
         showMsgs('تم التأكيد — أبلغ الطرفين', [['💬 أبلغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, false))], ['💬 أبلغ الزبون', wa(o.client_phone, clientApprovedMsg(o))]]);
       } }, '✅ تأكيد الطلب'),
-      h('button', { class: 'btn red', onclick: () => confirm('إلغاء هذا الطلب؟') && act(() => rpc('worker_cancel', { p_order: o.id }), 'تم الإلغاء', o) }, 'إلغاء'));
+      h('button', { class: 'btn red', onclick: async () => { const r = await askReason('إلغاء هذا الطلب'); if (r === null) return; await act(() => rpc('worker_cancel', { p_order: o.id, p_reason: r }), 'تم الإلغاء', o); showMsgs('أبلغ الزبون بالإلغاء', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))]]); } }, 'إلغاء'));
     if (o.status === 'confirmed' && !o.paid) row.append(
       h('button', { class: 'btn pri', onclick: async () => {
         if (!confirm('هل استلمت المبلغ من الزبون؟')) return;
         await act(() => rpc('worker_set_paid', { p_order: o.id }), 'تم تسجيل استلام المبلغ', o);
         showMsgs('تم استلام المبلغ — أبلغ الطرفين', [['💬 أبلغ الزبون (مع رقم صاحب الشقة)', wa(o.client_phone, clientPaidMsg(o))], ['💬 أبلغ صاحب الشقة', wa(o.owner_phone, ownerMsg(o, true))]]);
       } }, '💰 استلمت المبلغ'),
-      h('button', { class: 'btn red', onclick: () => confirm('إلغاء هذا الحجز؟') && act(() => rpc('worker_cancel', { p_order: o.id }), 'تم الإلغاء', o) }, 'إلغاء'));
+      h('button', { class: 'btn red', onclick: async () => { const r = await askReason('إلغاء هذا الحجز'); if (r === null) return; await act(() => rpc('worker_cancel', { p_order: o.id, p_reason: r }), 'تم الإلغاء', o); showMsgs('أبلغ الزبون بالإلغاء', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))]]); } }, 'إلغاء'));
     if (o.paid) row.append(waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o))));
     if (row.children.length) card.append(row);
     root.append(card);

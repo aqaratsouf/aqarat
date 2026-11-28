@@ -46,6 +46,12 @@ async function ordersView() {
     ok(sb.from('orders').select('*, workers(name, phone)').order('id', { ascending: false })),
     ok(sb.from('workers').select('*').order('id', { ascending: false }))]);
   const active = workers.filter(w => w.active);
+  const cancelOrder = async (o, title) => {
+    const r = await askReason(title);
+    if (r === null) return;
+    await act(() => rpc('admin_cancel_order', { p_order: o.id, p_reason: r }), 'تم الإلغاء');
+    showMsgs('أبلغ الزبون بالإلغاء', [['💬 أبلغ الزبون', wa(o.client_phone, clientCancelMsg(o, r))]]);
+  };
   const bucket = o => o.status === 'confirmed' ? (o.paid ? 'paid' : 'confirmed') : o.status;
   const conf = orders.filter(o => o.status === 'confirmed' && o.paid);
   const waiting = orders.filter(o => o.status === 'confirmed' && !o.paid);
@@ -79,7 +85,7 @@ async function ordersView() {
           } catch (e) { toast(e.message, false); }
           render();
         } }, '💰 الزبون سلّم المبلغ'),
-          h('button', { class: 'btn red', onclick: () => confirm('إلغاء هذا الحجز المؤكد وتحرير تواريخه؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الحجز'));
+          h('button', { class: 'btn red', onclick: () => cancelOrder(o, 'إلغاء هذا الحجز المؤكد وتحرير تواريخه') }, 'إلغاء الحجز'));
       } else {
         wrap.append(h('div', { class: 'muted', style: 'width:100%' }, 'استُلم المبلغ: ' + fdate(o.paid_at)),
           waBtn('💬 أعد إرسال رقم المالك للزبون', wa(o.client_phone, clientPaidMsg(o)), 'btn pri sm'),
@@ -118,7 +124,7 @@ async function ordersView() {
               showMsgs('أبلغ العامل بمهمته', [['💬 أبلغ ' + w.name, wa(w.phone, `السلام عليكم ${w.name}، لديك مهمة جديدة: طلب #${o.id} — ${o.listing_title} (${period(o)}). ادخل صفحتك لدراسته: ${workerLink()} (عقارات سوف)`)]]);
             } catch (e) { toast(e.message, false); }
           } }, '📤 إسناد للعامل'),
-          h('button', { class: 'btn red', onclick: () => confirm('إلغاء الطلب؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الطلب')));
+          h('button', { class: 'btn red', onclick: () => cancelOrder(o, 'إلغاء الطلب') }, 'إلغاء الطلب')));
     }
     card.append(h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn red sm', onclick: () => confirm('حذف هذا الطلب نهائياً؟ سيُمحى كأنه لم يحدث، ويُسحب من الحسابات والتواريخ المحجوزة، ويُعاد استخدام رقمه.') && act(() => rpc('admin_delete_order', { p_order: o.id }), 'تم حذف الطلب نهائياً') }, '🗑️ حذف نهائي')));
     const det = h('tr', { style: o.status === 'new' ? '' : 'display:none' }, h('td', { colspan: 14, style: 'background:#f6faf9' }, card));
@@ -156,7 +162,13 @@ function listingOwnerMsg(l) {
 }
 async function listingsView() {
   const [ls, rate] = await Promise.all([ok(sb.from('listings').select('*').order('id', { ascending: false })), rpc('get_rate')]);
-  const setStatus = (id, status, msg) => act(() => ok(sb.from('listings').update({ status }).eq('id', id)), msg);
+  const setStatus = (id, status, msg) => act(() => rpc('admin_set_listing_status', { p_listing: id, p_status: status }), msg);
+  const hide = async (l, rejected) => {
+    const r = await askReason(rejected ? 'رفض هذا العرض' : 'إخفاء هذا العرض');
+    if (r === null) return;
+    await act(() => rpc('admin_set_listing_status', { p_listing: l.id, p_status: 'hidden', p_reason: r }), rejected ? 'تم رفض العرض' : 'تم إخفاء العرض');
+    showMsgs('أبلغ صاحب الشقة', [['💬 أبلغ صاحب الشقة', wa(l.owner_phone, ownerHideMsg(l, r, rejected))]]);
+  };
   const del = async l => {
     if (!confirm('حذف العرض نهائياً؟ لن يظهر لأحد ولن يبقى له أثر، وسيُعاد استخدام رقمه.')) return;
     const withOrders = confirm('هل تحذف معه كل الطلبات المرتبطة به (كأن شيئاً لم يحدث)؟\nموافق = احذفها أيضاً · إلغاء = أبقِ الطلبات في السجل');
@@ -177,7 +189,8 @@ async function listingsView() {
         kv([['المالك', l.owner_name], ['هاتفه', tel(l.owner_phone)], ['سعره', money(l.price)], ['سعر الزبون', money(withRate(l.price, Number(rate)))], ['الصور', l.photos.length]]),
         h('div', { style: 'display:flex;gap:6px;margin-top:8px;flex-wrap:wrap' },
           l.status !== 'active' ? h('button', { class: 'btn pri sm', onclick: () => setStatus(l.id, 'active', 'تم النشر') }, 'نشر') : null,
-          l.status === 'active' ? h('button', { class: 'btn sm', onclick: () => setStatus(l.id, 'hidden') }, 'إخفاء') : null,
+          l.status === 'active' ? h('button', { class: 'btn sm', onclick: () => hide(l, false) }, 'إخفاء') : null,
+          l.status === 'pending' ? h('button', { class: 'btn red sm', onclick: () => hide(l, true) }, '❌ رفض') : null,
           h('a', { class: 'btn sm', style: 'text-decoration:none', target: '_blank', rel: 'noopener', href: listingOwnerMsg(l) }, '💬 واتساب للمالك'),
           h('button', { class: 'btn red sm', onclick: () => del(l) }, '🗑️ حذف نهائي')))));
   }

@@ -146,3 +146,19 @@ async function applySite() {
   document.title = document.title.replace('عقارات سوف', s.name);
 }
 applySite();
+
+// نافذة سبب الإلغاء (اختيارية): تُرجع النص (قد يكون فارغاً) أو null عند التراجع
+function askReason(title, hint = 'اكتب السبب الذي سيظهر للشخص (اختياري)') {
+  return new Promise(resolve => {
+    const t = h('textarea', { rows: 3, maxlength: 300, placeholder: hint, style: 'width:100%' });
+    const m = h('div', { class: 'modal' }, h('div', { class: 'box', style: 'max-width:420px' },
+      h('h3', {}, title), h('label', {}, 'السبب (اختياري)'), t,
+      h('div', { style: 'display:flex;gap:8px;margin-top:12px' },
+        h('button', { class: 'btn red', onclick: () => { m.remove(); resolve(t.value.trim()); } }, 'تأكيد'),
+        h('button', { class: 'btn', onclick: () => { m.remove(); resolve(null); } }, 'تراجع'))));
+    document.body.append(m); t.focus();
+  });
+}
+const reasonLine = r => r ? `\nالسبب: ${r}\n` : ' ';
+const clientCancelMsg = (o, r) => `السلام عليكم ${o.client_name}، نعتذر، تم إلغاء طلبك «${o.listing_title}» (${period(o)}).${reasonLine(r)}(عقارات سوف)`;
+const ownerHideMsg = (l, r, rejected) => `السلام عليكم ${l.owner_name}، ${rejected ? 'نعتذر، لم يُقبل' : 'تم إخفاء'} عرضك «${l.title}».${reasonLine(r)}(عقارات سوف)`;

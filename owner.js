@@ -11,6 +11,7 @@ async function myListingsView() {
       return h('div', { class: 'card pad' },
         h('div', {}, h('b', {}, l.title + ' '), h('span', { class: 'step ' + cls }, txt)),
         h('div', { class: 'muted' }, KLB[l.kind] + ' — سعرك: ' + money(l.price)),
+        l.status_note ? h('div', { class: 'note' }, 'ملاحظة الإدارة: ' + l.status_note) : null,
         h('h4', {}, 'الحجوزات المؤكدة'),
         l.bookings.length ? l.bookings.map(b => h('div', { class: 'sum' },
           h('div', {}, h('span', {}, 'المدة'), h('span', {}, 'من ' + fd(b.start) + ' إلى ' + fd(b.end))),
