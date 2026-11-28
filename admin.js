@@ -213,7 +213,7 @@ async function usersView() {
             } catch (e) { det.firstChild.textContent = e.message; }
           } }, 'التفاصيل'),
           ' ',
-          !u.user_id ? null : h('button', { class: 'btn sm ' + (u.banned ? 'pri' : 'red'), onclick: () => confirm(u.banned ? 'فك الحظر عن هذا الشخص؟' : 'حظر هذا الشخص؟ لن يستطيع الحجز أو إضافة عروض، وتختفي عروضه من الموقع حتى فك الحظر.') && act(() => rpc('admin_set_ban', { p_user: u.user_id, p_ban: !u.banned }), u.banned ? 'تم فك الحظر' : 'تم الحظر') }, u.banned ? 'فك الحظر' : '🚫 حظر'))));
+          h('button', { class: 'btn sm ' + (u.banned ? 'pri' : 'red'), onclick: () => confirm(u.banned ? 'فك الحظر عن هذا الشخص؟' : 'حظر هذا الشخص؟ لن يستطيع الحجز أو إضافة عروض (حتى برقم هاتفه)، وتختفي عروضه من الموقع حتى فك الحظر.') && act(() => rpc('admin_set_ban', { p_user: u.user_id, p_ban: !u.banned, p_phone: u.phone || null }), u.banned ? 'تم فك الحظر' : 'تم الحظر') }, u.banned ? 'فك الحظر' : '🚫 حظر'))));
       body.append(det);
     }
   };
