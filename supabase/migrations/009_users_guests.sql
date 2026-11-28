@@ -1,0 +1,1 @@
+-- admin_users تُظهر أيضاً السجلات القديمة بلا حساب (مجمّعة حسب الهاتف)، وadmin_user_detail(p_user, p_phone). انظر الهجرة المطبّقة users_guests.

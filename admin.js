@@ -59,25 +59,14 @@ async function ordersView() {
     h('button', { class: ofilter === k ? 'on' : '', onclick: () => { ofilter = k; render(); } }, `${v} (${orders.filter(o => bucket(o) === k).length})`))));
   const list = orders.filter(o => bucket(o) === ofilter);
   if (!list.length) root.append(h('div', { class: 'empty' }, 'لا توجد طلبات.'));
+  const tbody = h('tbody');
   for (const o of list) {
     const unit = o.kind === 'furnished' ? 'يوم' : 'شهر';
     const profitSpan = h('span', { class: 'profit' }, money(o.status === 'confirmed' ? o.profit : o.commission));
-    const card = h('div', { class: 'card pad' },
-      h('div', {}, h('b', {}, `طلب #${o.id} `), h('span', { class: 'badge ' + (o.paid ? 'active' : o.status) }, o.paid ? '💰 مدفوع' : o.status === 'confirmed' ? '✅ مؤكد — لم يُسلَّم المبلغ' : ST[o.status]), h('span', { class: 'muted' }, ' — ' + fdate(o.created_at))),
-      h('hr'),
-      kv([
-        ['الزبون', o.client_name], ['هاتف الزبون', tel(o.client_phone)],
-        ['العرض', `${o.listing_title} (${KL[o.kind]}) — ${o.address}`],
-        ['المدة', `${o.units} ${unit}`], ['تاريخ الحجز', period(o)],
-        ['السعر الإجمالي (يدفعه الزبون)', money(o.total)],
-        ['ما أدفعه لصاحب الشقة', money(o.owner_total)],
-        [`العمولة (${o.rate_pct}%)`, money(o.commission)],
-        ['صاحب الشقة', o.owner_name], ['هاتف صاحب الشقة', tel(o.owner_phone)],
-        ...(o.status === 'confirmed' ? [['العامل', o.workers ? `${o.workers.name} (حصته ${money(o.worker_cut)})` : 'بدون عامل']] : []),
-        ['فائدتي', profitSpan],
-      ]),
-      o.companions.length ? h('div', { style: 'margin-top:8px' }, h('b', {}, `المرافقون (${o.companions.length}):`),
-        o.companions.map(c => h('div', {}, `${c.name} ${c.surname} — ${c.relation}`))) : h('div', { class: 'muted', style: 'margin-top:8px' }, 'بدون مرافقين'));
+    const card = h('div', { class: 'pad', style: 'position:sticky;inset-inline-start:0;width:calc(100vw - 40px);max-width:640px;box-sizing:border-box' },
+      o.companions.length ? h('div', {}, h('b', {}, `المرافقون (${o.companions.length}):`),
+        o.companions.map(c => h('div', {}, `${c.name} ${c.surname} — ${c.relation}`))) : h('div', { class: 'muted' }, 'بدون مرافقين'),
+      o.status === 'confirmed' ? h('div', { class: 'muted' }, 'العامل: ' + (o.workers ? `${o.workers.name} (حصته ${money(o.worker_cut)})` : 'بدون عامل')) : null);
     if (o.status === 'confirmed') {
       const wrap = h('div', { style: 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap' });
       if (!o.paid) {
@@ -132,8 +121,25 @@ async function ordersView() {
           h('button', { class: 'btn red', onclick: () => confirm('إلغاء الطلب؟') && act(() => rpc('admin_cancel_order', { p_order: o.id }), 'تم الإلغاء') }, 'إلغاء الطلب')));
     }
     card.append(h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn red sm', onclick: () => confirm('حذف هذا الطلب نهائياً؟ سيُمحى كأنه لم يحدث، ويُسحب من الحسابات والتواريخ المحجوزة، ويُعاد استخدام رقمه.') && act(() => rpc('admin_delete_order', { p_order: o.id }), 'تم حذف الطلب نهائياً') }, '🗑️ حذف نهائي')));
-    root.append(card);
+    const det = h('tr', { style: o.status === 'new' ? '' : 'display:none' }, h('td', { colspan: 12, style: 'background:#f6faf9' }, card));
+    const stBadge = h('span', { class: 'badge ' + (o.paid ? 'active' : o.status) }, o.paid ? '💰 مدفوع' : o.status === 'confirmed' ? '✅ مؤكد — لم يُسلَّم' : ST[o.status]);
+    tbody.append(h('tr', {},
+      h('td', {}, '#' + o.id, h('div', { class: 'muted', style: 'font-size:11px' }, fdate(o.created_at))),
+      h('td', {}, h('b', {}, o.client_name), h('div', {}, tel(o.client_phone))),
+      h('td', {}, o.listing_title, h('div', { class: 'muted', style: 'font-size:12px' }, `${KL[o.kind]} — ${o.address}`)),
+      h('td', {}, `${o.units} ${unit}`),
+      h('td', {}, h('div', {}, 'من ' + fd(o.start_date)), h('div', {}, 'إلى ' + fd(o.end_date))),
+      h('td', {}, money(o.total)),
+      h('td', {}, money(o.owner_total)),
+      h('td', {}, money(o.commission), h('div', { class: 'muted', style: 'font-size:11px' }, o.rate_pct + '%')),
+      h('td', {}, o.owner_name, h('div', {}, tel(o.owner_phone))),
+      h('td', {}, profitSpan),
+      h('td', {}, stBadge),
+      h('td', {}, h('button', { class: 'btn sm', onclick: () => { det.style.display = det.style.display === 'none' ? '' : 'none'; } }, 'إجراءات ▾'))));
+    tbody.append(det);
   }
+  if (list.length) root.append(h('div', { style: 'overflow-x:auto' }, h('table', { class: 'tbl' },
+    h('thead', {}, h('tr', {}, ['رقم', 'الزبون', 'العرض', 'المدة', 'تاريخ الحجز', 'الإجمالي (يدفعه الزبون)', 'لصاحب الشقة', 'العمولة', 'صاحب الشقة', 'فائدتي', 'الحالة', ''].map(x => h('th', {}, x)))), tbody)));
   return root;
 }
 
@@ -193,21 +199,21 @@ async function usersView() {
       body.append(h('tr', { style: u.banned ? 'opacity:.6' : '' },
         h('td', {}, h('b', {}, u.full_name || '—'), u.banned ? h('div', { class: 'badge cancelled' }, 'محظور') : null),
         h('td', {}, u.phone ? h('a', { class: 'link', href: 'tel:' + u.phone }, u.phone) : '—'),
-        h('td', { dir: 'ltr', style: 'font-size:12px' }, u.email),
+        h('td', { dir: u.email ? 'ltr' : 'rtl', style: 'font-size:12px' }, u.email || 'بدون حساب (سجل قديم)'),
         h('td', {}, tags.length ? tags.map(x => h('div', {}, x)) : '—'),
         h('td', { style: 'white-space:nowrap' },
           h('button', { class: 'btn sm', onclick: async () => {
             if (det.style.display !== 'none') return (det.style.display = 'none');
             det.style.display = '';
             try {
-              const d = await rpc('admin_user_detail', { p_user: u.user_id });
+              const d = await rpc('admin_user_detail', { p_user: u.user_id, p_phone: u.phone || null });
               det.firstChild.replaceChildren(
                 h('b', {}, 'ما استأجره:'), ...(d.orders.length ? d.orders.map(o => h('div', {}, `#${o.id} ${o.title} — ${fd(o.start)} → ${fd(o.end)} — ${money(o.total)} — ${ORD_ST(o)}`)) : [h('div', { class: 'muted' }, 'لا شيء')]),
                 h('b', {}, 'عروضه:'), ...(d.listings.length ? d.listings.map(l => h('div', {}, `#${l.id} ${l.title} — ${money(l.price)} — ${ST[l.status] || l.status}`)) : [h('div', { class: 'muted' }, 'لا شيء')]));
             } catch (e) { det.firstChild.textContent = e.message; }
           } }, 'التفاصيل'),
           ' ',
-          h('button', { class: 'btn sm ' + (u.banned ? 'pri' : 'red'), onclick: () => confirm(u.banned ? 'فك الحظر عن هذا الشخص؟' : 'حظر هذا الشخص؟ لن يستطيع الحجز أو إضافة عروض، وتختفي عروضه من الموقع حتى فك الحظر.') && act(() => rpc('admin_set_ban', { p_user: u.user_id, p_ban: !u.banned }), u.banned ? 'تم فك الحظر' : 'تم الحظر') }, u.banned ? 'فك الحظر' : '🚫 حظر'))));
+          !u.user_id ? null : h('button', { class: 'btn sm ' + (u.banned ? 'pri' : 'red'), onclick: () => confirm(u.banned ? 'فك الحظر عن هذا الشخص؟' : 'حظر هذا الشخص؟ لن يستطيع الحجز أو إضافة عروض، وتختفي عروضه من الموقع حتى فك الحظر.') && act(() => rpc('admin_set_ban', { p_user: u.user_id, p_ban: !u.banned }), u.banned ? 'تم فك الحظر' : 'تم الحظر') }, u.banned ? 'فك الحظر' : '🚫 حظر'))));
       body.append(det);
     }
   };
