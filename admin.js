@@ -254,6 +254,171 @@ async function usersView() {
 
 // مفتاح استقبال طلبات العمل (يظهر في تبويب الطلبات والإعدادات)
 async function appsSwitch() {
+  const open = await workerAppsOpen();
+  const sw = h('input', { type: 'checkbox' }); sw.checked = !!open;
+  sw.onchange = () => act(() => ok(sb.from('settings').update({ worker_apps_open: sw.checked }).eq('id', 1)), sw.checked ? 'فُتح استقبال طلبات العمل' : 'أُوقف استقبال طلبات العمل');
+  return h('div', { class: 'card pad' }, h('h3', {}, '👷 طلبات العمل'),
+    h('label', { style: 'font-weight:400' }, sw, ' استقبال طلبات العمل مفتوح (تظهر أيقونة «طلب العمل» للزوار)'),
+    h('div', { class: 'muted' }, 'عند الإيقاف تختفي الأيقونة ولا يُقبل أي طلب جديد.'));
+}
+
+// ---------------- طلبات العمل ----------------
+async function appsView() {
+  const [apps, rate, ws] = await Promise.all([ok(sb.from('worker_applications').select('*').order('id', { ascending: false })), rpc('get_rate'), ok(sb.from('workers').select('id,user_id,active'))]);
+  const max = Number(rate), root = h('div');
+  root.append(await appsSwitch());
+  if (!apps.length) root.append(h('div', { class: 'empty' }, 'لا توجد طلبات عمل.'));
+  for (const x of apps) {
+    const r = h('input', { type: 'number', step: '0.1', min: 0, max, value: max / 2, style: 'width:90px' });
+    const card = h('div', { class: 'card pad' },
+      h('div', {}, h('b', {}, x.first_name + ' ' + x.last_name + ' '), h('span', { class: 'badge ' + (x.status === 'approved' ? 'active' : x.status === 'rejected' ? 'cancelled' : 'pending') }, { pending: 'قيد الدراسة', approved: 'مقبول', rejected: 'مرفوض' }[x.status])),
+      kv([['تاريخ الميلاد', fd(x.birth_date)], ['الهاتف', tel(x.phone)], ['التقديم', fdate(x.created_at)]]));
+    if (x.status === 'pending') card.append(h('hr'), h('label', {}, 'نسبة العامل % من سعر الشقة (من أصل ' + max + '%)'), r,
+      h('div', { style: 'display:flex;gap:8px;margin-top:10px' },
+        h('button', { class: 'btn pri', onclick: async () => {
+          if (!confirm('قبول هذا العامل؟')) return;
+          try {
+            await rpc('admin_review_application', { p_app: x.id, p_approve: true, p_rate: +r.value }); toast('تم القبول'); render();
+            showMsgs('أبلغ العامل بالقبول', [['💬 أرسل رابط صفحته', wa(x.phone, `السلام عليكم ${x.first_name}، تم قبول طلبك للعمل معنا في عقارات سوف ✅. نسبتك ${r.value}% من سعر الشقة في كل عملية. ادخل صفحتك بالبريد وكلمة السر التي سجّلت بها: ${workerLink()}`)]]);
+          } catch (e) { toast(e.message, false); }
+        } }, '✅ قبول'),
+        h('button', { class: 'btn red', onclick: async () => {
+          if (!confirm('رفض هذا الطلب؟')) return;
+          try {
+            await rpc('admin_review_application', { p_app: x.id, p_approve: false }); toast('تم الرفض'); render();
+            showMsgs('أبلغ صاحب الطلب بالرفض', [['💬 أرسل الرد', wa(x.phone, `السلام عليكم ${x.first_name}، نعتذر، لم يُقبل طلبك للعمل في عقارات سوف حالياً. شكراً لاهتمامك.`)]]);
+          } catch (e) { toast(e.message, false); }
+        } }, '❌ رفض')));
+    if (x.status === 'approved') {
+      const w = ws.find(z => z.user_id === x.user_id);
+      if (w) {
+        const stop = async () => {
+          const why = await askReason('إلغاء عمل ' + x.first_name);
+          if (why === null) return;
+          await act(() => ok(sb.from('workers').update({ active: false }).eq('id', w.id)), 'تم إيقاف العامل');
+          showMsgs('أبلغ العامل', [['💬 أرسل الرد', wa(x.phone, `السلام عليكم ${x.first_name}، تم إيقاف عملك معنا في عقارات سوف.${reasonLine(why)}`)]]);
+        };
+        const back = () => act(() => ok(sb.from('workers').update({ active: true }).eq('id', w.id)), 'أُعيد تفعيل العامل');
+        card.append(h('hr'), h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
+          h('span', { class: 'badge ' + (w.active ? 'active' : 'hidden') }, w.active ? 'معتمد حالياً' : 'موقوف'),
+          w.active ? h('button', { class: 'btn red sm', onclick: stop }, 'إلغاء عمله') : h('button', { class: 'btn pri sm', onclick: back }, 'إعادة تفعيله')));
+      }
+    }
+    root.append(card);
+  }
+  return root;
+}
+
+// ---------------- العمال ----------------
+async function workersView() {
+  const [ws, rate, orders] = await Promise.all([
+    ok(sb.from('workers').select('*').order('id', { ascending: false })), rpc('get_rate'),
+    ok(sb.from('orders').select('worker_id,worker_cut').eq('status', 'confirmed').eq('paid', true))]);
+  const max = Number(rate);
+  const stat = id => orders.filter(o => o.worker_id === id).reduce((a, o) => ({ done: a.done + 1, earned: a.earned + o.worker_cut }), { done: 0, earned: 0 });
+  const root = h('div');
+  const name = h('input', { required: true, maxlength: 80 });
+  const phone = h('input', { type: 'tel', required: true });
+  const r0 = h('input', { type: 'number', step: '0.1', min: 0, max, value: max / 2, required: true });
+  const f = h('form', { class: 'card pad' }, h('h3', {}, 'إضافة عامل يدوياً (بدون حساب دخول)'),
+    h('div', { class: 'row' }, h('div', {}, h('label', {}, 'الاسم'), name), h('div', {}, h('label', {}, 'الهاتف'), phone)),
+    h('label', {}, `نسبة العامل من سعر الشقة % (من أصل ${max}% عمولة الوساطة)`), r0,
+    h('button', { class: 'btn pri', style: 'margin-top:10px' }, 'اعتماد العامل'));
+  f.onsubmit = e => {
+    e.preventDefault();
+    act(() => ok(sb.from('workers').insert({ name: name.value.trim(), phone: phone.value.trim(), rate_pct: +r0.value })), 'تمت إضافة العامل');
+  };
+  root.append(f);
+  for (const w of ws) {
+    const s = stat(w.id);
+    const r = h('input', { type: 'number', step: '0.1', min: 0, max, value: w.rate_pct, style: 'width:90px' });
+    const a = h('input', { type: 'checkbox' }); a.checked = !!w.active;
+    root.append(h('div', { class: 'card pad' },
+      h('div', {}, h('b', {}, w.name + ' '), h('span', { class: 'badge ' + (w.active ? 'active' : 'hidden') }, w.active ? 'معتمد' : 'موقوف')),
+      kv([['الهاتف', tel(w.phone)], ['طلبات مستلمة المبلغ', s.done], ['مستحقاته الإجمالية', money(s.earned)]]),
+      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
+        h('label', { style: 'margin:0' }, 'النسبة %'), r,
+        h('label', { style: 'margin:0;font-weight:400' }, a, ' معتمد (بإلغاء التحديد يُمنع من الدخول فوراً)'),
+        h('button', { class: 'btn pri sm', onclick: async () => {
+          let why = '';
+          if (w.active && !a.checked) { why = await askReason('إلغاء عمل ' + w.name); if (why === null) { a.checked = true; return; } }
+          await act(() => ok(sb.from('workers').update({ rate_pct: +r.value, active: a.checked }).eq('id', w.id)), 'تم الحفظ');
+          if (w.active && !a.checked) showMsgs('أبلغ العامل', [['💬 أرسل الرد', wa(w.phone, `السلام عليكم ${w.name}، تم إيقاف عملك معنا في عقارات سوف.${reasonLine(why)}`)]]);
+        } }, 'حفظ'))));
+  }
+  if (!ws.length) root.append(h('div', { class: 'empty' }, 'لا يوجد عمال بعد.'));
+  return root;
+}
+
+// ---------------- الإعدادات ----------------
+async function settingsView() {
+  const cur = Number(await rpc('get_rate'));
+  const rate = h('input', { type: 'number', step: '0.1', min: 0, max: 50, value: cur, required: true });
+  const f1 = h('form', { class: 'card pad' }, h('h3', {}, 'نسبة الوساطة'),
+    h('label', {}, 'النسبة % (تُضاف على سعر صاحب الشقة)'), rate,
+    h('div', { class: 'muted' }, 'التغيير يسري على العروض والطلبات الجديدة فقط؛ الطلبات السابقة تحتفظ بنسبتها.'),
+    h('button', { class: 'btn pri', style: 'margin-top:10px' }, 'حفظ النسبة'));
+  f1.onsubmit = e => { e.preventDefault(); act(() => ok(sb.from('settings').update({ rate_pct: +rate.value }).eq('id', 1)), 'تم حفظ النسبة'); };
+  const o = h('input', { type: 'password', required: true, autocomplete: 'current-password' });
+  const n = h('input', { type: 'password', required: true, minlength: 8, autocomplete: 'new-password' });
+  const f2 = h('form', { class: 'card pad' }, h('h3', {}, 'تغيير كلمة المرور'),
+    h('label', {}, 'الحالية'), o, h('label', {}, 'الجديدة (8 أحرف على الأقل)'), n,
+    h('button', { class: 'btn pri', style: 'margin-top:10px' }, 'تغيير'));
+  f2.onsubmit = async e => {
+    e.preventDefault();
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const chk = await sb.auth.signInWithPassword({ email: user.email, password: o.value });
+      if (chk.error) throw new Error('كلمة المرور الحالية خاطئة');
+      const { error } = await sb.auth.updateUser({ password: n.value });
+      if (error) throw new Error('تعذر تغيير كلمة المرور (8 أحرف على الأقل)');
+      toast('تم تغيير كلمة المرور'); o.value = ''; n.value = '';
+    } catch (x) { toast(x.message, false); }
+  };
+  const ns = (await ok(sb.from('settings').select('notify_telegram_token,notify_telegram_chat,notify_wa_phone,notify_wa_key').eq('id', 1)))[0] || {};
+  const tt = h('input', { type: 'password', value: ns.notify_telegram_token || '', autocomplete: 'off', placeholder: '123456789:AA...' });
+  const tc = h('input', { value: ns.notify_telegram_chat || '', inputmode: 'numeric', placeholder: 'رقم المحادثة' });
+  const wp = h('input', { value: ns.notify_wa_phone || '', type: 'tel', placeholder: '2136XXXXXXXX' });
+  const wk = h('input', { type: 'password', value: ns.notify_wa_key || '', autocomplete: 'off' });
+  const detect = h('button', { type: 'button', class: 'btn sm', onclick: async () => {
+    if (!/^[0-9]{5,12}:[A-Za-z0-9_-]{30,50}$/.test(tt.value.trim())) return toast('ألصق رمز البوت أولاً', false);
+    try {
+      const r = await (await fetch('https://api.telegram.org/bot' + tt.value.trim() + '/getUpdates')).json();
+      const m = (r.result || []).map(u => u.message && u.message.chat).filter(Boolean).pop();
+      if (!m) return toast('لم أجد رسالة: افتح البوت في تيليغرام واضغط Start ثم أرسل له أي كلمة، ثم أعد المحاولة', false);
+      tc.value = m.id; toast('تم العثور على رقم المحادثة — اضغط حفظ');
+    } catch { toast('تعذر الاتصال بتيليغرام', false); }
+  } }, '🔎 اكتشاف رقم المحادثة');
+  const f3 = h('form', { class: 'card pad' }, h('h3', {}, '🔔 الإشعارات'),
+    h('div', { class: 'muted' }, 'تصلك رسالة عند: عرض جديد، طلب جديد، تأكيد كراء، استلام مبلغ.'),
+    h('h4', {}, 'تيليغرام (يعمل الآن)'),
+    h('label', {}, 'رمز البوت (من BotFather)'), tt, h('label', {}, 'رقم المحادثة'), tc, detect,
+    h('h4', {}, 'واتساب عبر CallMeBot (اختياري)'),
+    h('label', {}, 'رقم هاتفك بالصيغة الدولية'), wp, h('label', {}, 'مفتاح CallMeBot'), wk,
+    h('div', { style: 'display:flex;gap:8px;margin-top:10px' },
+      h('button', { class: 'btn pri' }, 'حفظ'),
+      h('button', { type: 'button', class: 'btn', onclick: async () => {
+        try { const r = await rpc('admin_notify_test'); toast(r.error ? (r.error === 'no_channel' ? 'احفظ إعدادات قناة أولاً' : 'خطأ: ' + r.error) : 'أُرسلت رسالة تجريبية: ' + JSON.stringify(Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v.status])))); }
+        catch (e) { toast(e.message, false); }
+      } }, 'إرسال رسالة تجريبية')));
+  f3.onsubmit = e => { e.preventDefault(); act(() => ok(sb.from('settings').update({
+    notify_telegram_token: tt.value.trim() || null, notify_telegram_chat: tc.value.trim() || null,
+    notify_wa_phone: wp.value.trim() || null, notify_wa_key: wk.value.trim() || null }).eq('id', 1)), 'تم حفظ الإشعارات'); };
+  const si = await rpc('site_info');
+  const sname = h('input', { value: si.name, maxlength: 40, required: true });
+  const sfile = h('input', { type: 'file', accept: 'image/*' });
+  const prev = h('img', { class: 'banner', src: si.banner ? bannerUrl(si.banner) : 'banner.jpg', style: 'margin:8px 0;max-height:180px;object-fit:cover' });
+  const f5 = h('form', { class: 'card pad' }, h('h3', {}, '🎨 هوية الموقع'),
+    h('label', {}, 'اسم الموقع'), sname,
+    h('label', {}, 'صورة الواجهة الرئيسية (اتركها فارغة للإبقاء على الحالية)'), prev, sfile,
+    h('div', { style: 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap' },
+      h('button', { class: 'btn pri' }, 'حفظ'),
+      h('button', { type: 'button', class: 'btn', onclick: () => confirm('العودة إلى الصورة الأصلية؟') && act(() => ok(sb.from('settings').update({ banner_path: null }).eq('id', 1)), 'تمت العودة للصورة الأصلية') }, 'الصورة الأصلية')));
+  f5.onsubmit = e => { e.preventDefault(); act(async () => {
+    const upd = { site_name: sname.value.trim() };
+    if (sfile.files[0]) upd.banner_path = await uploadTo('site-assets', sfile.files[0]);
+    await ok(sb.from('settings').update(upd).eq('id', 1));
+  }, 'تم حفظ هوية الموقع'); };
   const f4 = await appsSwitch();
   return h('div', {}, f5, f4, f1, f3, f2);
 }
