@@ -207,9 +207,21 @@ async function usersView() {
             det.style.display = '';
             try {
               const d = await rpc('admin_user_detail', { p_user: u.user_id, p_phone: u.phone || null });
-              det.firstChild.replaceChildren(
-                h('b', {}, 'ما استأجره:'), ...(d.orders.length ? d.orders.map(o => h('div', {}, `#${o.id} ${o.title} — ${fd(o.start)} → ${fd(o.end)} — ${money(o.total)} — ${ORD_ST(o)}`)) : [h('div', { class: 'muted' }, 'لا شيء')]),
-                h('b', {}, 'عروضه:'), ...(d.listings.length ? d.listings.map(l => h('div', {}, `#${l.id} ${l.title} — ${money(l.price)} — ${ST[l.status] || l.status}`)) : [h('div', { class: 'muted' }, 'لا شيء')]));
+              const money2 = (lbl, v, cls) => h('div', {}, lbl + ': ', h('b', { class: cls || '' }, money(v)));
+              const split = x => h('div', { style: 'margin-top:4px;padding-inline-start:10px;border-inline-start:3px solid #b7d3cf' },
+                money2(x.paid ? 'استلمه صاحب الشقة' : 'مستحق لصاحب الشقة (لم يُسلَّم بعد)', x.owner_total),
+                money2('عمولتنا الإجمالية', x.commission),
+                money2('حصة العامل' + (x.worker ? ' (' + x.worker + ')' : ''), x.worker_cut || 0),
+                money2('فائدة المدير الصافية', x.profit == null ? x.commission : x.profit, 'profit'),
+                h('div', {}, 'العامل المكلّف: ', h('b', {}, x.worker || 'بدون عامل')));
+              const box = (title, st, body) => h('div', { style: 'background:#fff;border:1px solid #d8e6e4;border-radius:10px;padding:8px 10px;margin:6px 0;white-space:normal' }, h('b', {}, title), ' ', st ? h('span', { class: 'muted' }, st) : null, body);
+              det.firstChild.replaceChildren(h('div', { style: 'position:sticky;inset-inline-start:0;width:calc(100vw - 52px);max-width:640px;white-space:normal' },
+                h('h4', { style: 'margin:4px 0' }, '🔑 ما استأجره'),
+                ...(d.orders.length ? d.orders.map(o => box(`#${o.id} ${o.title}`, `${fd(o.start)} ← ${fd(o.end)} — ${ORD_ST(o)}`,
+                  h('div', {}, money2('دفع الزبون (الإجمالي)', o.total), o.status === 'cancelled' ? null : split(o)))) : [h('div', { class: 'muted' }, 'لا شيء')]),
+                h('h4', { style: 'margin:10px 0 4px' }, '🏢 عروضه'),
+                ...(d.listings.length ? d.listings.map(l => box(`#${l.id} ${l.title}`, `${money(l.price)} — ${ST[l.status] || l.status}`,
+                  l.bookings.length ? h('div', {}, ...l.bookings.map(b => h('div', { style: 'margin-top:6px' }, `حجز #${b.id} — ${b.client} — ${fd(b.start)} ← ${fd(b.end)}`, split(b)))) : h('div', { class: 'muted' }, 'لا حجوزات مؤكدة'))) : [h('div', { class: 'muted' }, 'لا شيء')])));
             } catch (e) { det.firstChild.textContent = e.message; }
           } }, 'التفاصيل'),
           ' ',
